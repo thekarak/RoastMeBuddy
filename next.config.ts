@@ -1,11 +1,7 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@neondatabase/serverless", "pdfjs-dist"],
-  turbopack: {
-    root: path.resolve(__dirname),
-  },
+  serverExternalPackages: ["@neondatabase/serverless", "pdf2json"],
 };
 
 export default nextConfig;
