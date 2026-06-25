@@ -58,6 +58,10 @@ DATABASE_URL=your_neon_connection_string
 ```
 It works fine without it — links are encoded in the URL anyway.
 
+Hosting:
+
+thinking of hosting in Vercel.
+
 ## License
 
 MIT
