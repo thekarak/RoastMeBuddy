@@ -1,26 +1,147 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0A0A0F;
+  --surface: #13131A;
+  --surface2: #1C1C26;
+  --primary: #FF4500;
+  --secondary: #8B5CF6;
+  --tertiary: #F97316;
+  --text: #F1F1F3;
+  --muted: #71717A;
+  --border: rgba(255, 255, 255, 0.08);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--bg);
+  --color-surface: var(--surface);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-tertiary: var(--tertiary);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --font-headline: "Syne", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "Geist Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Glass card */
+.glass {
+  background: rgba(19, 19, 26, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+}
+
+/* Glow effects */
+.glow-orange:hover {
+  box-shadow: 0 0 30px rgba(255, 69, 0, 0.25);
+  border-color: rgba(255, 69, 0, 0.4) !important;
+}
+.glow-purple:hover {
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.25);
+  border-color: rgba(139, 92, 246, 0.4) !important;
+}
+
+/* Gradient text */
+.grad-text {
+  background: linear-gradient(135deg, var(--primary), var(--tertiary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.grad-text-purple {
+  background: linear-gradient(135deg, var(--secondary), var(--primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Button gradient */
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--tertiary));
+  color: white;
+  font-family: var(--font-headline);
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 20px rgba(255, 69, 0, 0.35);
+}
+.btn-primary:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 32px rgba(255, 69, 0, 0.55);
+}
+.btn-primary:active {
+  transform: scale(0.97);
+}
+
+/* Score ring animation */
+@keyframes stroke-fill {
+  from { stroke-dashoffset: 283; }
+  to   { stroke-dashoffset: var(--offset); }
+}
+.score-ring-fill {
+  animation: stroke-fill 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  stroke-dasharray: 283;
+  stroke-dashoffset: 283;
+}
+
+/* Shimmer */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+  background-size: 400px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Fade in up */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in-up {
+  animation: fade-in-up 0.6s ease forwards;
+}
+
+/* Tab active */
+.tab-active {
+  background: rgba(255, 69, 0, 0.15);
+  color: var(--primary);
+  border: 1px solid rgba(255, 69, 0, 0.35);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* Scrollbar hide for tab bar */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
