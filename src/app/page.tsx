@@ -171,8 +171,20 @@ export default function HomePage() {
           body: JSON.stringify({ url, mode, roastLevel }),
         });
       }
-      const data = await res.json();
+      let data;
+      const responseText = await res.text();
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        throw new Error(
+          res.ok 
+            ? "Invalid server response format." 
+            : `Server error (${res.status}): ${responseText.slice(0, 150)}`
+        );
+      }
+
       if (!res.ok) throw new Error(data.error || "Failed");
+      
       // Start cooldown timer (skip if it was a cache hit)
       if (!data.cached) localStorage.setItem("lastRoastTime", Date.now().toString());
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data.result))));

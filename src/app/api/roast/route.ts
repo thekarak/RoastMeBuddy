@@ -3,8 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { scrapeUrl } from "@/lib/scraper";
 import { parseFile } from "@/lib/fileParser";
 import {
-  runBatch1,
-  runBatch2,
+  runMegaBatch,
   generateAiroast,
   portfolioRoast,
   RoastContext,
@@ -151,20 +150,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ id, result: cachedFull, cached: true });
     }
 
-    // ── 3-call batch orchestration (was 7 calls) ──────────────────────────
-    // Call 1: audit + ux + personas  (1 API call)
-    // Call 2: sharkTank + funeral + actionPlan  (1 API call, uses Call 1 scores)
-    // Call 3: aiRoast narrative  (1 API call, runs in parallel with Call 2)
-    const batch1 = await runBatch1(ctx);
-    const { audit, ux, personas } = batch1;
-
-    const [batch2, aiRoast] = await Promise.all([
-      runBatch2(ctx, { audit, ux }),
+    // ── 2-call parallel orchestration (was 3 calls, originally 7) ──────────
+    // Call 1: runMegaBatch (Audit + UX + Personas + SharkTank + Funeral + ActionPlan) — 1 API call
+    // Call 2: generateAiroast narrative (1 API call)
+    // Runs both concurrently for sub-6 second execution speed.
+    const [megaBatch, aiRoast] = await Promise.all([
+      runMegaBatch(ctx),
       generateAiroast(ctx),
     ]);
-    const { sharkTank, funeral, actionPlan } = batch2;
 
-    // Call 4 (optional): portfolio mode only
+    const { audit, ux, personas, sharkTank, funeral, actionPlan } = megaBatch;
+
+    // Call 3 (optional): portfolio mode only
     const portfolio = mode === "portfolio" ? await portfolioRoast(ctx) : undefined;
 
     const fullResult: FullRoastResult = {

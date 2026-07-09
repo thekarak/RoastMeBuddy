@@ -249,65 +249,21 @@ function buildContext(ctx: RoastContext, maxChars = 2500): string {
   ].filter(Boolean).join("\n\n");
 }
 
-// ── BATCH 1: Audit + UX + Personas — 1 API call ───────────────────────────
-// Previously 3 separate calls. Now 1 combined call saving ~67% of batch RPM.
-export async function runBatch1(ctx: RoastContext): Promise<{
+// ── BATCH 1: Mega-Batch (Audit + UX + Personas + SharkTank + Funeral + ActionPlan) — 1 API call ──
+// Merges all structured reports into a single, clean JSON structure to avoid timeout limits.
+export async function runMegaBatch(ctx: RoastContext): Promise<{
   audit: AuditResult;
   ux: UXResult;
   personas: PersonaResult[];
+  sharkTank: SharkTankResult;
+  funeral: FuneralResult;
+  actionPlan: ActionPlanResult;
 }> {
   const isPortfolio = ctx.mode === "portfolio";
   const personaDefs = isPortfolio
     ? [{ name: "Recruiter", emoji: "🔍", color: "#FF4500" }, { name: "Hiring Manager", emoji: "💼", color: "#8B5CF6" }, { name: "Fellow Designer", emoji: "🎨", color: "#F97316" }]
     : [{ name: "First-Time Visitor", emoji: "👀", color: "#FF4500" }, { name: "Founder", emoji: "🚀", color: "#8B5CF6" }, { name: "Investor", emoji: "💰", color: "#F97316" }];
 
-  const prompt = `You are an expert ${isPortfolio ? "portfolio" : "product"} analyst. ${getRoastTone(ctx.roastLevel)}
-
-Analyse the following ${ctx.mode} across THREE dimensions simultaneously and return a SINGLE JSON object.
-
-${buildContext(ctx)}
-
-Return ONLY this JSON (no markdown, no extra text):
-{
-  "audit": {
-    "overallScore": 0, "problemClarity": 0, "valueProp": 0,
-    "differentiation": 0, "positioning": 0,
-    "summary": "", "strengths": [], "weaknesses": []
-  },
-  "ux": {
-    "score": 0, "visualHierarchy": 0, "ctaPlacement": 0, "trustSignals": 0,
-    "frictionPoints": [], "criticalIssues": [], "warnings": [], "quickWins": []
-  },
-  "personas": [
-    {"persona":"${personaDefs[0].name}","emoji":"${personaDefs[0].emoji}","color":"${personaDefs[0].color}","firstImpression":"","mainObjection":"","verdict":"","score":0},
-    {"persona":"${personaDefs[1].name}","emoji":"${personaDefs[1].emoji}","color":"${personaDefs[1].color}","firstImpression":"","mainObjection":"","verdict":"","score":0},
-    {"persona":"${personaDefs[2].name}","emoji":"${personaDefs[2].emoji}","color":"${personaDefs[2].color}","firstImpression":"","mainObjection":"","verdict":"","score":0}
-  ]
-}`;
-
-  const raw = await callGemini(prompt, { jsonMode: true, maxTokens: 3500 });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const d = parseJSON<any>(raw, {});
-  return {
-    audit:    normalizeAudit(d?.audit    || {}),
-    ux:       normalizeUX(d?.ux         || {}),
-    personas: Array.isArray(d?.personas) ? d.personas : personaDefs.map(p => ({
-      persona: p.name, emoji: p.emoji, color: p.color,
-      firstImpression: "N/A", mainObjection: "N/A", verdict: "N/A", score: 50,
-    })),
-  };
-}
-
-// ── BATCH 2: SharkTank + Funeral + ActionPlan — 1 API call ────────────────
-// Previously 3 separate calls. Now 1 combined call.
-export async function runBatch2(
-  ctx: RoastContext,
-  batch1: { audit: AuditResult; ux: UXResult }
-): Promise<{
-  sharkTank: SharkTankResult;
-  funeral: FuneralResult;
-  actionPlan: ActionPlanResult;
-}> {
   const tone = ctx.roastLevel;
   const investorTone = tone === "brutal" ? "the most RUTHLESS investors alive — destroy the pitch"
     : tone === "hard" ? "aggressive investors who tear apart weak pitches"
@@ -319,26 +275,33 @@ export async function runBatch2(
     : tone === "medium" ? "The product failed. Write a direct autopsy."
     : "The product has failed. Write a thoughtful post-mortem.";
 
-  // Pass summary of batch 1 results + original context for better action plan
-  const contextSummary = `Audit score: ${batch1.audit.overallScore}/100. UX score: ${batch1.ux.score}/100.
-Key weaknesses: ${batch1.audit.weaknesses.slice(0, 3).join("; ")}.
-Critical UX issues: ${batch1.ux.criticalIssues.slice(0, 2).join("; ")}.`;
+  const prompt = `You are a world-class product auditor, UX researcher, startup investor, and strategist. ${getRoastTone(ctx.roastLevel)}
 
-  const prompt = `You are analysing a ${ctx.mode}. ${getRoastTone(ctx.roastLevel)}
-Context: ${buildContext(ctx, 1500)}
+Analyse the following ${ctx.mode} across multiple dimensions simultaneously and return a SINGLE JSON object.
 
-Prior analysis summary: ${contextSummary}
+${buildContext(ctx)}
 
-As ${investorTone}, and applying this funeral framing — "${funeralTone}" — return ONLY this JSON:
+Return ONLY this JSON structure (no markdown fences, no extra text):
 {
+  "audit": {
+    "overallScore": 0, "problemClarity": 0, "valueProp": 0, "differentiation": 0, "positioning": 0,
+    "summary": "", "strengths": [], "weaknesses": []
+  },
+  "ux": {
+    "score": 0, "visualHierarchy": 0, "ctaPlacement": 0, "trustSignals": 0,
+    "frictionPoints": [], "criticalIssues": [], "warnings": [], "quickWins": []
+  },
+  "personas": [
+    {"persona":"${personaDefs[0].name}","emoji":"${personaDefs[0].emoji}","color":"${personaDefs[0].color}","firstImpression":"","mainObjection":"","verdict":"","score":0},
+    {"persona":"${personaDefs[1].name}","emoji":"${personaDefs[1].emoji}","color":"${personaDefs[1].color}","firstImpression":"","mainObjection":"","verdict":"","score":0},
+    {"persona":"${personaDefs[2].name}","emoji":"${personaDefs[2].emoji}","color":"${personaDefs[2].color}","firstImpression":"","mainObjection":"","verdict":"","score":0}
+  ],
   "sharkTank": {
     "questions": [{"question":"","concern":""},{"question":"","concern":""},{"question":"","concern":""},{"question":"","concern":""}],
-    "marketRisk": "", "moatAnalysis": "", "moatScore": 0,
-    "fundingVerdict": "", "fundingReadiness": 0
+    "marketRisk": "", "moatAnalysis": "", "moatScore": 0, "fundingVerdict": "", "fundingReadiness": 0
   },
   "funeral": {
-    "causeOfDeath": "", "timeOfDeath": "", "missedSignals": [],
-    "epitaph": "", "preventionPlan": [], "survivalChance": 0
+    "causeOfDeath": "", "timeOfDeath": "", "missedSignals": [], "epitaph": "", "preventionPlan": [], "survivalChance": 0
   },
   "actionPlan": {
     "thisWeek":    [{"action":"","impact":"High","effort":"Low"},{"action":"","impact":"High","effort":"Low"},{"action":"","impact":"High","effort":"Low"}],
@@ -347,22 +310,29 @@ As ${investorTone}, and applying this funeral framing — "${funeralTone}" — r
   }
 }`;
 
-  const raw = await callGemini(prompt, { jsonMode: true, maxTokens: 3500 });
+  const raw = await callGemini(prompt, { jsonMode: true, maxTokens: 4000 });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const d = parseJSON<any>(raw, {});
+
   return {
+    audit: normalizeAudit(d?.audit || {}),
+    ux: normalizeUX(d?.ux || {}),
+    personas: Array.isArray(d?.personas) ? d.personas : personaDefs.map(p => ({
+      persona: p.name, emoji: p.emoji, color: p.color,
+      firstImpression: "N/A", mainObjection: "N/A", verdict: "N/A", score: 50,
+    })),
     sharkTank: d?.sharkTank ? {
-      questions:       Array.isArray(d.sharkTank.questions) ? d.sharkTank.questions : [],
-      marketRisk:      String(d.sharkTank.marketRisk  || ""),
-      moatAnalysis:    String(d.sharkTank.moatAnalysis || ""),
-      moatScore:       Number(d.sharkTank.moatScore)   || 0,
-      fundingVerdict:  String(d.sharkTank.fundingVerdict || ""),
-      fundingReadiness:Number(d.sharkTank.fundingReadiness) || 0,
+      questions: Array.isArray(d.sharkTank.questions) ? d.sharkTank.questions : [],
+      marketRisk: String(d.sharkTank.marketRisk || ""),
+      moatAnalysis: String(d.sharkTank.moatAnalysis || ""),
+      moatScore: Number(d.sharkTank.moatScore) || 0,
+      fundingVerdict: String(d.sharkTank.fundingVerdict || ""),
+      fundingReadiness: Number(d.sharkTank.fundingReadiness) || 0,
     } : { questions: [], marketRisk: "", moatAnalysis: "", moatScore: 0, fundingVerdict: "", fundingReadiness: 0 },
-    funeral:    normalizeFuneral(d?.funeral    || {}),
+    funeral: normalizeFuneral(d?.funeral || {}),
     actionPlan: d?.actionPlan ? {
-      thisWeek:    Array.isArray(d.actionPlan.thisWeek)    ? d.actionPlan.thisWeek    : [],
-      thisSprint:  Array.isArray(d.actionPlan.thisSprint)  ? d.actionPlan.thisSprint  : [],
+      thisWeek: Array.isArray(d.actionPlan.thisWeek) ? d.actionPlan.thisWeek : [],
+      thisSprint: Array.isArray(d.actionPlan.thisSprint) ? d.actionPlan.thisSprint : [],
       thisQuarter: Array.isArray(d.actionPlan.thisQuarter) ? d.actionPlan.thisQuarter : [],
     } : { thisWeek: [], thisSprint: [], thisQuarter: [] },
   };
@@ -403,21 +373,19 @@ Return ONLY this JSON:
 // ── Backwards-compat exports (used by existing pages) ─────────────────────
 // These are kept for compatibility but are no longer called by the API route.
 export async function auditProduct(ctx: RoastContext): Promise<AuditResult> {
-  return (await runBatch1(ctx)).audit;
+  return (await runMegaBatch(ctx)).audit;
 }
 export async function auditUX(ctx: RoastContext): Promise<UXResult> {
-  return (await runBatch1(ctx)).ux;
+  return (await runMegaBatch(ctx)).ux;
 }
 export async function simulatePersonas(ctx: RoastContext): Promise<PersonaResult[]> {
-  return (await runBatch1(ctx)).personas;
+  return (await runMegaBatch(ctx)).personas;
 }
 export async function sharkTankMode(ctx: RoastContext): Promise<SharkTankResult> {
-  const b1 = await runBatch1(ctx);
-  return (await runBatch2(ctx, b1)).sharkTank;
+  return (await runMegaBatch(ctx)).sharkTank;
 }
 export async function productFuneral(ctx: RoastContext): Promise<FuneralResult> {
-  const b1 = await runBatch1(ctx);
-  return (await runBatch2(ctx, b1)).funeral;
+  return (await runMegaBatch(ctx)).funeral;
 }
 export async function buildActionPlan(_: Partial<FullRoastResult>): Promise<ActionPlanResult> {
   return { thisWeek: [], thisSprint: [], thisQuarter: [] };
