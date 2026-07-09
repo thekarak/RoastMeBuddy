@@ -151,7 +151,13 @@ async function callCerebras(
           temperature: 0.8,
           ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
         }),
+        signal: AbortSignal.timeout(6000), // 6 seconds timeout to prevent hanging Vercel
       });
+
+      if ((res.status === 401 || res.status === 403) || res.status === 400) {
+        const errText = await res.text().catch(() => "Unauthorized/Invalid Request");
+        throw new Error(`Cerebras Authentication/Request Error (${res.status}): ${errText}`);
+      }
 
       if (res.status === 429 && attempt < MAX_RETRIES) {
         const waitMs = Math.min(2000 * Math.pow(2, attempt), 10000);
@@ -169,9 +175,13 @@ async function callCerebras(
       const content = data.choices?.[0]?.message?.content?.trim();
       return content ?? "";
     } catch (err: unknown) {
-      if (attempt >= MAX_RETRIES) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isAuthError = msg.includes("Authentication/Request Error") || msg.includes("401") || msg.includes("403");
+      
+      if (isAuthError || attempt >= MAX_RETRIES) {
         throw err;
       }
+      console.warn(`Cerebras request attempt ${attempt + 1} failed: ${msg}. Retrying in 1.5s...`);
       await sleep(1500);
     }
   }

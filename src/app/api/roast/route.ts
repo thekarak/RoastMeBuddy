@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
     const id = generateId(12);
     // Cache in-memory so GET works even without a database
     resultCache.set(id, { result: fullResult, createdAt: Date.now() });
-    await saveRoast(id, mode, url, fullResult);
+    saveRoast(id, mode, url, fullResult);
 
     return NextResponse.json({ id, result: fullResult });
   } catch (err) {
@@ -269,7 +269,7 @@ export async function GET(req: NextRequest) {
       resultCache.set(id, { result: roastData, createdAt: Date.now() });
       
       // Save back to PostgreSQL database
-      await updateRoastInDb(id, roastData);
+      updateRoastInDb(id, roastData);
 
       return NextResponse.json({ aiRoast: generatedRoast });
     } catch (err) {
