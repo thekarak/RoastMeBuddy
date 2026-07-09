@@ -2,7 +2,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ROAST_LEVELS, type RoastLevel } from "@/lib/mistral";
+import { ROAST_LEVELS, type RoastLevel } from "@/lib/gemini";
 
 // ── WebGL animated background ──────────────────────────────────────────────
 function ShaderBackground() {
@@ -136,7 +136,7 @@ export default function HomePage() {
       </header>
 
       {/* ── HERO ── */}
-      <section id="hero" className="relative min-h-screen flex items-center justify-center pt-24 pb-16 px-6 overflow-hidden">
+      <section id="hero" className="relative min-h-screen flex items-center justify-center pt-36 pb-16 px-6 overflow-hidden">
         <ShaderBackground />
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0F]/30 via-[#0A0A0F]/60 to-[#0A0A0F] pointer-events-none z-0" />
 
@@ -307,7 +307,7 @@ export default function HomePage() {
 
           {/* Social proof */}
           <div className="mt-10 flex flex-col items-center gap-3 opacity-60">
-            <p className="text-xs font-mono text-[#71717A] uppercase tracking-widest">Free · No signup · Powered by Mistral AI</p>
+            <p className="text-xs font-mono text-[#71717A] uppercase tracking-widest">Free · No signup · Powered by AI</p>
             <div className="flex gap-6 text-xs text-[#71717A]">
               <span>🔥 2,400+ products roasted</span>
               <span>⚡ &lt;60s results</span>
@@ -420,7 +420,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <span className="text-xl">🔥</span>
             <span style={{ fontFamily: "Syne, sans-serif", color: "var(--primary)" }} className="font-bold">RoastMeBuddy!</span>
-            <span className="text-[#71717A] text-sm ml-2">© 2026 · Built for bold builders · Powered by Mistral AI</span>
+            <span className="text-[#71717A] text-sm ml-2">© 2026 · Built for bold builders · Powered by AI</span>
           </div>
           <div className="flex gap-6 text-sm text-[#71717A]">
             <a href="#" className="hover:text-white transition-colors">Privacy</a>
