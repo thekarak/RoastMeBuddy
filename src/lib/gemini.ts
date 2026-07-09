@@ -1,7 +1,9 @@
-// lib/gemini.ts — Google Gemini 2.5 Pro via AI Studio
+// lib/gemini.ts — Google Gemini via AI Studio
 import { GoogleGenAI } from "@google/genai";
 
-const MODEL = "gemini-2.5-pro";
+// gemini-2.5-flash: fast + smart (recommended for production)
+// gemini-2.5-pro: slower but deeper reasoning (set GEMINI_MODEL=gemini-2.5-pro to override)
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 function getClient(): GoogleGenAI {
   const key = process.env.GEMINI_API_KEY;
