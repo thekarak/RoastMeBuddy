@@ -186,7 +186,12 @@ export async function POST(req: NextRequest) {
     console.error("Roast API error:", err);
     const msg = err instanceof Error ? err.message : "Unknown error";
     if (msg.includes("CEREBRAS_API_KEY is not set")) {
-      return NextResponse.json({ error: "Server Configuration Error: CEREBRAS_API_KEY is not defined in Vercel environment variables." }, { status: 500 });
+      const availableKeys = Object.keys(process.env)
+        .filter(k => k.toUpperCase().includes("KEY") || k.toUpperCase().includes("CEREB") || k.toUpperCase().includes("GEMINI") || k.toUpperCase().includes("DATABASE"))
+        .join(", ");
+      return NextResponse.json({ 
+        error: `Server Configuration Error: CEREBRAS_API_KEY is not defined. Available env vars on Vercel: [${availableKeys || "None"}]` 
+      }, { status: 500 });
     }
     if (msg.includes("401") || msg.includes("Unauthorized") || msg.includes("API_KEY_INVALID") || msg.includes("api_key")) {
       return NextResponse.json({ error: "Authentication Error: The Cerebras API key was rejected as invalid. Check your key at cloud.cerebras.ai." }, { status: 500 });
