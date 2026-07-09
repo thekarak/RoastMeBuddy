@@ -14,7 +14,7 @@ import {
   RoastContext,
   RoastLevel,
   FullRoastResult,
-} from "@/lib/mistral";
+} from "@/lib/gemini";
 
 function generateId(length = 12): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -162,8 +162,8 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Roast API error:", err);
     const msg = err instanceof Error ? err.message : "Unknown error";
-    if (msg.includes("MISTRAL_API_KEY") || msg.includes("api_key")) {
-      return NextResponse.json({ error: "Invalid or missing Mistral API key." }, { status: 500 });
+    if (msg.includes("GEMINI_API_KEY") || msg.includes("api_key") || msg.includes("API_KEY_INVALID")) {
+      return NextResponse.json({ error: "Invalid or missing Gemini API key. Get one free at aistudio.google.com" }, { status: 500 });
     }
     if (msg.includes("worker") || msg.includes("pdf")) {
       return NextResponse.json({ error: "Failed to parse PDF file. Try a different file." }, { status: 400 });

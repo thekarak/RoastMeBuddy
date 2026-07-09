@@ -11,6 +11,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@google/genai": "^2.10.0",
     "@neondatabase/serverless": "^1.1.0",
     "cheerio": "^1.2.0",
     "drizzle-orm": "^0.45.2",
