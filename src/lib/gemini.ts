@@ -133,7 +133,7 @@ async function callGemini(
 ): Promise<string> {
   const { jsonMode = true, maxTokens = 3000 } = opts;
   const ai = getClient();
-  const MAX_RETRIES = 4;
+  const MAX_RETRIES = 1;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
