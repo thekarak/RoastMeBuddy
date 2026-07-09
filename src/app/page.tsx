@@ -1,8 +1,66 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ROAST_LEVELS, type RoastLevel } from "@/lib/gemini";
+
+// 45s cooldown — safely below the 15 RPM free tier limit (3 calls per roast)
+const COOLDOWN_MS = 45_000;
+
+// ── Cooldown ring component ────────────────────────────────────────────────
+function CooldownRing({ remainingMs, totalMs }: { remainingMs: number; totalMs: number }) {
+  const r = 20;
+  const circ = 2 * Math.PI * r;
+  const progress = remainingMs / totalMs; // 1 → 0
+  const offset = circ * (1 - progress);  // ring depletes as time passes
+  const secs = Math.ceil(remainingMs / 1000);
+
+  // Colour shifts orange → yellow → green as timer nears zero
+  const color = secs <= 5 ? "#22C55E" : secs <= 15 ? "#F59E0B" : "#FF4500";
+
+  return (
+    <div className="flex items-center gap-3 py-3 px-5 glass rounded-full border border-white/10">
+      {/* Depleting ring */}
+      <div className="relative w-10 h-10 flex-shrink-0">
+        <svg className="w-full h-full -rotate-90" viewBox="0 0 48 48">
+          <circle cx="24" cy="24" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
+          <circle
+            cx="24" cy="24" r={r} fill="none"
+            stroke={color} strokeWidth="4"
+            strokeDasharray={circ}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            style={{
+              transition: "stroke-dashoffset 0.1s linear, stroke 0.5s ease",
+              filter: `drop-shadow(0 0 4px ${color}99)`,
+            }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span style={{ fontFamily: "Geist Mono, monospace", color, fontSize: 11 }} className="font-bold leading-none">
+            {secs}
+          </span>
+        </div>
+      </div>
+      {/* Label */}
+      <div className="text-left">
+        <p className="text-xs font-mono" style={{ color }}>Cooling down…</p>
+        <p className="text-[10px] text-[#71717A] font-mono">Next roast ready in {secs}s</p>
+      </div>
+      {/* Shimmer bar */}
+      <div className="flex-1 h-1 rounded-full bg-white/5 overflow-hidden min-w-[60px]">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{
+            width: `${(1 - progress) * 100}%`,
+            background: `linear-gradient(90deg, ${color}66, ${color})`,
+            transition: "width 0.1s linear",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
 // ── WebGL animated background ──────────────────────────────────────────────
 function ShaderBackground() {
@@ -67,8 +125,22 @@ export default function HomePage() {
   const [inputMode, setInputMode] = useState<"url" | "file">("url");
   const [roastLevel, setRoastLevel] = useState<RoastLevel>("medium");
   const [file, setFile] = useState<File | null>(null);
+  const [cooldownMs, setCooldownMs] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Restore cooldown from localStorage on mount + tick every 100ms
+  useEffect(() => {
+    function tick() {
+      const stored = localStorage.getItem("lastRoastTime");
+      if (!stored) { setCooldownMs(0); return; }
+      const remaining = COOLDOWN_MS - (Date.now() - parseInt(stored));
+      setCooldownMs(remaining > 0 ? remaining : 0);
+    }
+    tick();
+    const id = setInterval(tick, 100);
+    return () => clearInterval(id);
+  }, []);
 
   async function handleRoast(e: React.FormEvent) {
     e.preventDefault();
@@ -101,6 +173,8 @@ export default function HomePage() {
       }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
+      // Start cooldown timer (skip if it was a cache hit)
+      if (!data.cached) localStorage.setItem("lastRoastTime", Date.now().toString());
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data.result))));
       router.push(`/roast/${data.id}#${encoded}`);
     } catch (err) {
@@ -211,34 +285,39 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* URL input */}
+              {/* URL input + submit */}
               {inputMode === "url" && (
-                <div className="relative group">
-                  <div className="absolute -inset-0.5 bg-gradient-to-r from-[#FF4500] to-[#8B5CF6] rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
-                  <div className="relative flex items-center glass border border-white/10 rounded-full p-1.5 shadow-2xl">
-                    <span className="text-[#71717A] ml-4 text-lg">🔗</span>
-                    <input
-                      ref={inputRef}
-                      type="url"
-                      value={url}
-                      onChange={(e) => { setUrl(e.target.value); setError(""); }}
-                      placeholder="https://your-product.com"
-                      className="flex-1 bg-transparent border-none outline-none text-[#F1F1F3] placeholder-[#71717A] px-4 py-3 font-mono text-base"
-                      disabled={loading}
-                    />
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="btn-primary flex-shrink-0 px-7 py-3 rounded-full flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {loading ? (
-                        <>
-                          <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Roasting…
-                        </>
-                      ) : "Roast It →"}
-                    </button>
+                <div className="space-y-3">
+                  <div className="relative group">
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-[#FF4500] to-[#8B5CF6] rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
+                    <div className="relative flex items-center glass border border-white/10 rounded-full p-1.5 shadow-2xl">
+                      <span className="text-[#71717A] ml-4 text-lg">🔗</span>
+                      <input
+                        ref={inputRef}
+                        type="url"
+                        value={url}
+                        onChange={(e) => { setUrl(e.target.value); setError(""); }}
+                        placeholder="https://your-product.com"
+                        className="flex-1 bg-transparent border-none outline-none text-[#F1F1F3] placeholder-[#71717A] px-4 py-3 font-mono text-base"
+                        disabled={loading || cooldownMs > 0}
+                      />
+                      <button
+                        type="submit"
+                        disabled={loading || cooldownMs > 0}
+                        className="btn-primary flex-shrink-0 px-7 py-3 rounded-full flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {loading ? (
+                          <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Roasting…</>
+                        ) : "Roast It →"}
+                      </button>
+                    </div>
                   </div>
+                  {/* Cooldown timer — shown below input when active */}
+                  {cooldownMs > 0 && !loading && (
+                    <div className="flex justify-center fade-in-up">
+                      <CooldownRing remainingMs={cooldownMs} totalMs={COOLDOWN_MS} />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -287,18 +366,22 @@ export default function HomePage() {
                       </div>
                     )}
                   </div>
+                  {/* File upload submit button */}
                   <button
                     type="submit"
-                    disabled={loading || !file}
+                    disabled={loading || !file || cooldownMs > 0}
                     className="btn-primary mt-4 w-full px-7 py-3 rounded-full flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {loading ? (
-                      <>
-                        <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Roasting…
-                      </>
+                      <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Roasting…</>
                     ) : "Roast My CV →"}
                   </button>
+                  {/* Cooldown timer for file mode */}
+                  {cooldownMs > 0 && !loading && (
+                    <div className="mt-3 flex justify-center fade-in-up">
+                      <CooldownRing remainingMs={cooldownMs} totalMs={COOLDOWN_MS} />
+                    </div>
+                  )}
                 </div>
               )}
 

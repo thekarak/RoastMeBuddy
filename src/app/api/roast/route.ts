@@ -3,14 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { scrapeUrl } from "@/lib/scraper";
 import { parseFile } from "@/lib/fileParser";
 import {
-  auditProduct,
-  auditUX,
-  simulatePersonas,
-  sharkTankMode,
-  productFuneral,
-  buildActionPlan,
-  portfolioRoast,
+  runBatch1,
+  runBatch2,
   generateAiroast,
+  portfolioRoast,
   RoastContext,
   RoastLevel,
   FullRoastResult,
@@ -45,6 +41,26 @@ function checkRateLimit(ip: string): boolean {
 // In-memory cache fallback so shared links work without a database
 const resultCache = new Map<string, { result: unknown; createdAt: number }>();
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+// ── URL result cache ──────────────────────────────────────────────────────
+// Same URL + mode + roastLevel within 30 min = instant result, 0 API calls.
+const urlResultCache = new Map<string, { result: FullRoastResult; createdAt: number }>();
+const URL_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+function getUrlCacheKey(url: string | undefined, mode: string, roastLevel: string): string {
+  return `${(url || "").toLowerCase().trim()}::${mode}::${roastLevel}`;
+}
+
+function getCachedResult(key: string): FullRoastResult | null {
+  const entry = urlResultCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.createdAt > URL_CACHE_TTL) {
+    urlResultCache.delete(key);
+    return null;
+  }
+  return entry.result;
+}
+
 
 async function saveRoast(id: string, mode: string, url: string | undefined, result: unknown) {
   if (!process.env.DATABASE_URL) return;
@@ -124,34 +140,40 @@ export async function POST(req: NextRequest) {
 
     const ctx: RoastContext = { mode, roastLevel, url, scrapedText, description };
 
-    // Batch 1: audit, ux, personas (parallel)
-    const [audit, ux, personas] = await Promise.all([
-      auditProduct(ctx),
-      auditUX(ctx),
-      simulatePersonas(ctx),
-    ]);
-    await new Promise((r) => setTimeout(r, 1500));
+    // ── URL result cache check ────────────────────────────────────────────
+    // If same URL+mode+level was roasted in the last 30 min, return instantly (0 API calls).
+    const cacheKey = getUrlCacheKey(url, mode, roastLevel);
+    const cachedFull = url ? getCachedResult(cacheKey) : null;
+    if (cachedFull) {
+      console.log(`Cache hit for ${url} — skipping AI calls`);
+      const id = generateId(12);
+      resultCache.set(id, { result: cachedFull, createdAt: Date.now() });
+      return NextResponse.json({ id, result: cachedFull, cached: true });
+    }
 
-    // Batch 2: sharkTank, funeral, aiRoast (parallel)
-    const [sharkTank, funeral, aiRoast] = await Promise.all([
-      sharkTankMode(ctx),
-      productFuneral(ctx),
+    // ── 3-call batch orchestration (was 7 calls) ──────────────────────────
+    // Call 1: audit + ux + personas  (1 API call)
+    // Call 2: sharkTank + funeral + actionPlan  (1 API call, uses Call 1 scores)
+    // Call 3: aiRoast narrative  (1 API call, runs in parallel with Call 2)
+    const batch1 = await runBatch1(ctx);
+    const { audit, ux, personas } = batch1;
+
+    const [batch2, aiRoast] = await Promise.all([
+      runBatch2(ctx, { audit, ux }),
       generateAiroast(ctx),
     ]);
+    const { sharkTank, funeral, actionPlan } = batch2;
 
-    // Batch 3: portfolio (if needed, depends on mode)
+    // Call 4 (optional): portfolio mode only
     const portfolio = mode === "portfolio" ? await portfolioRoast(ctx) : undefined;
-
-    const partialResult: Partial<FullRoastResult> = {
-      audit, ux, personas, sharkTank, funeral,
-      ...(portfolio ? { portfolio } : {}),
-    };
-    const actionPlan = await buildActionPlan(partialResult);
 
     const fullResult: FullRoastResult = {
       audit, ux, personas, sharkTank, funeral, actionPlan, roastLevel, aiRoast,
       ...(portfolio ? { portfolio } : {}),
     };
+
+    // Store in URL cache for next identical request
+    if (url) urlResultCache.set(cacheKey, { result: fullResult, createdAt: Date.now() });
 
     const id = generateId(12);
     // Cache in-memory so GET works even without a database
