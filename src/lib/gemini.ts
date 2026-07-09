@@ -137,7 +137,7 @@ async function callGemini(
   prompt: string,
   opts: { jsonMode?: boolean; maxTokens?: number } = {}
 ): Promise<string> {
-  const { jsonMode = true, maxTokens = 3000 } = opts;
+  const { jsonMode = true, maxTokens = 8192 } = opts;
   const ai = getClient();
 
   // 1. Try models in the failover pool sequentially
@@ -304,6 +304,8 @@ export async function runMegaBatch(ctx: RoastContext): Promise<{
 
 Analyse the following ${ctx.mode} across multiple dimensions simultaneously and return a SINGLE JSON object.
 
+CRITICAL: Keep all summaries and text explanations under 2 sentences. Keep all list items under 12 words. Be punchy, direct, and concise to avoid response truncation.
+
 ${buildContext(ctx)}
 
 Return ONLY this JSON structure (no markdown fences, no extra text):
@@ -335,7 +337,7 @@ Return ONLY this JSON structure (no markdown fences, no extra text):
   }
 }`;
 
-  const raw = await callGemini(prompt, { jsonMode: true, maxTokens: 4000 });
+  const raw = await callGemini(prompt, { jsonMode: true, maxTokens: 8192 });
   const d = parseJSON<any>(raw, null);
 
   if (!d || !d.audit || !d.ux) {
