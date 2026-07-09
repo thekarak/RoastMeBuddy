@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ROAST_LEVELS, type RoastLevel } from "@/lib/gemini";
+import { ROAST_LEVELS, type RoastLevel } from "@/lib/cerebras";
 
 // 45s cooldown — safely below the 15 RPM free tier limit (3 calls per roast)
 const COOLDOWN_MS = 45_000;

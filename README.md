@@ -2,9 +2,9 @@
 
 > **AI-powered product audit tool.** Drop in a URL, get back a brutally honest, scored teardown — from a PM, an investor, and a real user. In under 60 seconds.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/thekarak/CVRoaster&env=GEMINI_API_KEY&envDescription=Get%20your%20free%20Gemini%20API%20key%20at%20aistudio.google.com&envLink=https://aistudio.google.com)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/thekarak/CVRoaster&env=CEREBRAS_API_KEY&envDescription=Get%20your%20Cerebras%20API%20key%20at%20cloud.cerebras.ai&envLink=https://cloud.cerebras.ai)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
-[![Gemini](https://img.shields.io/badge/Gemini_2.5_Pro-Free_API-4285F4?logo=google)](https://aistudio.google.com)
+[![Cerebras](https://img.shields.io/badge/Cerebras_AI-gpt--oss--120b-orange?logo=ai)](https://cloud.cerebras.ai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -44,7 +44,7 @@ Choose how hard you want to be hit:
 | Layer | Technology |
 |-------|-----------|
 | **Framework** | [Next.js 16](https://nextjs.org) — App Router, TypeScript |
-| **AI Model** | [Gemini 2.5 Pro](https://aistudio.google.com) — Google AI Studio (free API) |
+| **AI Model** | [Cerebras AI](https://cloud.cerebras.ai) — gpt-oss-120b |
 | **Styling** | Tailwind CSS v4 — dark mode, glassmorphism |
 | **Database** | [Neon](https://neon.tech) PostgreSQL + [Drizzle ORM](https://orm.drizzle.team) |
 | **Scraping** | [Cheerio](https://cheerio.js.org) — server-side HTML parsing (no Puppeteer) |
@@ -56,7 +56,7 @@ Choose how hard you want to be hit:
 
 ### Prerequisites
 - Node.js 18+
-- A free [Google AI Studio](https://aistudio.google.com) account (for the API key)
+- A free [Cerebras Cloud](https://cloud.cerebras.ai) account (for the API key)
 - *(Optional)* A free [Neon](https://neon.tech) project (for persistent share links)
 
 ### 1. Clone & Install
@@ -76,16 +76,16 @@ cp .env.example .env.local
 Open `.env.local` and add your keys:
 
 ```env
-# Required — free at https://aistudio.google.com
-GEMINI_API_KEY=AIza...
+# Required — get at https://cloud.cerebras.ai
+CEREBRAS_API_KEY=cbs-...
 
 # Optional — enables persistent share links
 DATABASE_URL=postgresql://user:pass@host.neon.tech/neondb?sslmode=require
 ```
 
-**Getting your Gemini API key:**
-1. Go to [aistudio.google.com](https://aistudio.google.com)
-2. Click **Get API key** → **Create API key**
+**Getting your Cerebras API key:**
+1. Go to [cloud.cerebras.ai](https://cloud.cerebras.ai)
+2. Click **API Keys** → **Create API Key**
 3. Copy and paste into `.env.local`
 
 ### 3. (Optional) Set Up Database
@@ -116,7 +116,7 @@ src/
 │   ├── api/roast/route.ts    # Main API — scrape + AI orchestration
 │   └── globals.css           # Design system
 └── lib/
-    ├── gemini.ts             # All 8 AI engines (Gemini 2.5 Pro)
+    ├── cerebras.ts           # All 8 AI engines (Cerebras gpt-oss-120b)
     ├── scraper.ts            # Cheerio URL scraper
     ├── fileParser.ts         # PDF / DOCX file parsing
     ├── db.ts                 # Neon + Drizzle connection
@@ -128,7 +128,7 @@ src/
 ## 🚢 Deploy to Vercel
 
 ### One-click deploy:
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/thekarak/CVRoaster&env=GEMINI_API_KEY)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/thekarak/CVRoaster&env=CEREBRAS_API_KEY)
 
 ### Manual deploy:
 ```bash
@@ -136,7 +136,7 @@ npx vercel --prod
 ```
 
 Add these environment variables in your Vercel project settings:
-- `GEMINI_API_KEY` — **required**
+- `CEREBRAS_API_KEY` — **required**
 - `DATABASE_URL` — optional (Neon connection string)
 
 ---
@@ -150,16 +150,15 @@ User Input (URL / File / Text)
    Cheerio Scraper  ──►  Page context (title, headings, CTAs, body)
         │
         ▼
-  Gemini 2.5 Pro  ──►  Parallel AI batch processing
-  ┌─────────┬─────────┬──────────┐
-  │ Audit   │  UX     │ Personas │  ← Batch 1 (parallel)
-  └─────────┴─────────┴──────────┘
-  ┌──────────────┬─────────┬────────────┐
-  │ Shark Tank   │ Funeral │ AI Roast   │  ← Batch 2 (parallel)
-  └──────────────┴─────────┴────────────┘
-  ┌─────────────┬──────────────┐
-  │ Action Plan │ Portfolio*   │  ← Batch 3
-  └─────────────┴──────────────┘
+  Cerebras AI  ──►  Parallel AI batch processing
+  ┌─────────────────────────────────────┐
+  │ runMegaBatch                        │  ← Batch 1 (Audit, UX, Personas,
+  │ (Audit, UX, Personas, Shark Tank,   │    Shark Tank, Funeral, Action Plan)
+  │  Funeral, Action Plan in 1 Call)    │
+  └─────────────────────────────────────┘
+  ┌─────────────────────────────────────┐
+  │ generateAiroast                     │  ← Batch 2 (Lazy text generation)
+  └─────────────────────────────────────┘
         │
         ▼
    Save to Neon DB  ──►  Return share link
@@ -198,5 +197,5 @@ MIT © 2026 CVRoaster — Built for bold builders.
 
 <p align="center">
   <strong>Built with ❤️ and 🔥 for the Mind the Product × World Product Day 2026 Hackathon</strong><br/>
-  <em>Powered by Gemini 2.5 Pro · Hosted on Vercel · Data on Neon</em>
+  <em>Powered by Cerebras Cloud · Hosted on Vercel · Data on Neon</em>
 </p>

@@ -1,16 +1,11 @@
-// lib/gemini.ts — Google Gemini via AI Studio (optimised: 3 calls per roast)
-import { GoogleGenAI } from "@google/genai";
+// lib/cerebras.ts — Cerebras AI API
+const MODEL = "gpt-oss-120b";
+const CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1/chat/completions";
 
-// Free tier limits (requests per minute):
-//   gemini-2.0-flash : 15 RPM ← default, safe for 3 calls per roast
-//   gemini-2.5-flash : 5 RPM  ← too low for 3 calls in burst
-//   gemini-2.5-pro   : 5 RPM  ← set GEMINI_MODEL=gemini-2.5-pro for premium quality
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-
-function getClient(): GoogleGenAI {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("GEMINI_API_KEY is not set in environment variables");
-  return new GoogleGenAI({ apiKey: key });
+function getApiKey(): string {
+  const key = process.env.CEREBRAS_API_KEY;
+  if (!key) throw new Error("CEREBRAS_API_KEY is not set in environment variables");
+  return key;
 }
 
 // ── Roast levels ───────────────────────────────────────────────────────────
@@ -124,68 +119,58 @@ export interface FullRoastResult {
   description?: string;
 }
 
-const MODELS_POOL = [
-  MODEL,
-  "gemini-2.0-flash-lite",
-  "gemini-2.5-flash",
-  "gemini-2.5-pro",
-];
-
+// ── Core call helper ───────────────────────────────────────────────────────
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function callGemini(
+async function callCerebras(
   prompt: string,
-  opts: { jsonMode?: boolean; maxTokens?: number } = {}
+  opts: { jsonMode?: boolean } = {}
 ): Promise<string> {
-  const { jsonMode = true, maxTokens = 8192 } = opts;
-  const ai = getClient();
+  const { jsonMode = true } = opts;
+  const key = getApiKey();
+  const MAX_RETRIES = 3;
 
-  // 1. Try models in the failover pool sequentially
-  for (const currentModel of MODELS_POOL) {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const response = await ai.models.generateContent({
-        model: currentModel,
-        contents: prompt,
-        config: {
-          temperature: 0.8,
-          maxOutputTokens: maxTokens,
-          ...(jsonMode ? { responseMimeType: "application/json" } : {}),
+      const res = await fetch(CEREBRAS_BASE_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${key}`,
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.8,
+          ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+        }),
       });
-      return response.text?.trim() ?? "";
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const isAuthError = msg.includes("API_KEY_INVALID") || msg.includes("API_KEY") || msg.includes("invalid key");
-      
-      if (isAuthError) {
-        throw err; // Re-throw authentication issues immediately so they can be fixed
+
+      if (res.status === 429 && attempt < MAX_RETRIES) {
+        const waitMs = Math.min(2000 * Math.pow(2, attempt), 10000);
+        console.warn(`Cerebras rate limit hit — waiting ${waitMs}ms before retry ${attempt + 1}/${MAX_RETRIES}`);
+        await sleep(waitMs);
+        continue;
       }
-      
-      // Log error (rate limit, 404, etc.) and proceed to failover
-      console.warn(`Gemini failover: ${currentModel} returned error: ${msg}. Trying next...`);
-      continue;
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "Unknown error");
+        throw new Error(`Cerebras API error ${res.status}: ${errText}`);
+      }
+
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content?.trim();
+      return content ?? "";
+    } catch (err: unknown) {
+      if (attempt >= MAX_RETRIES) {
+        throw err;
+      }
+      await sleep(1500);
     }
   }
-
-  // 2. If all models in the pool failed, wait 2.5 seconds and retry the default model once
-  console.warn("All models in failover pool rate limited or failed. Sleeping 2.5s before final retry...");
-  await sleep(2500);
-
-  try {
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: prompt,
-      config: {
-        temperature: 0.8,
-        maxOutputTokens: maxTokens,
-        ...(jsonMode ? { responseMimeType: "application/json" } : {}),
-      },
-    });
-    return response.text?.trim() ?? "";
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`Gemini API: rate limit exceeded on all models after failover. Details: ${msg}`);
-  }
+  throw new Error("Cerebras API: failed after retries");
 }
 
 // ── Normalizers ────────────────────────────────────────────────────────────
@@ -264,8 +249,6 @@ function parseJSON<T>(text: string, fallback: T): T {
 }
 
 // ── Context helper ─────────────────────────────────────────────────────────
-// Shared, trimmed context string used across all batch calls.
-// One scrape → one context string → passed to all prompts.
 function buildContext(ctx: RoastContext, maxChars = 2500): string {
   return [
     ctx.url ? `URL: ${ctx.url}` : "",
@@ -274,8 +257,7 @@ function buildContext(ctx: RoastContext, maxChars = 2500): string {
   ].filter(Boolean).join("\n\n");
 }
 
-// ── BATCH 1: Mega-Batch (Audit + UX + Personas + SharkTank + Funeral + ActionPlan) — 1 API call ──
-// Merges all structured reports into a single, clean JSON structure to avoid timeout limits.
+// ── BATCH 1: Mega-Batch — 1 API call ───────────────────────────────────────
 export async function runMegaBatch(ctx: RoastContext): Promise<{
   audit: AuditResult;
   ux: UXResult;
@@ -337,11 +319,11 @@ Return ONLY this JSON structure (no markdown fences, no extra text):
   }
 }`;
 
-  const raw = await callGemini(prompt, { jsonMode: true, maxTokens: 8192 });
+  const raw = await callCerebras(prompt, { jsonMode: true });
   const d = parseJSON<any>(raw, null);
 
   if (!d || !d.audit || !d.ux) {
-    console.error("Gemini failed to output valid JSON. Raw response:", raw);
+    console.error("Cerebras failed to output valid JSON. Raw response:", raw);
     throw new Error(`AI generated invalid response structure. Raw: ${raw.slice(0, 150)}...`);
   }
 
@@ -369,7 +351,7 @@ Return ONLY this JSON structure (no markdown fences, no extra text):
   };
 }
 
-// ── CALL 3: AI Roast narrative — 1 API call (plain text) ──────────────────
+// ── CALL 2: AI Roast narrative — 1 API call (plain text) ──────────────────
 export async function generateAiroast(ctx: RoastContext): Promise<string> {
   const toneMap = {
     light:  "Be witty and observational. Like a clever friend at a coffee shop.",
@@ -385,11 +367,11 @@ ${buildContext(ctx, 1200)}
 
 Return ONLY the roast text. No JSON, no labels, no formatting.`;
 
-  const text = await callGemini(prompt, { jsonMode: false, maxTokens: 1200 });
+  const text = await callCerebras(prompt, { jsonMode: false });
   return text || "Could not generate roast. The product was so boring even the AI fell asleep.";
 }
 
-// ── CALL 4 (optional): Portfolio — only runs when mode=portfolio ───────────
+// ── CALL 3 (optional): Portfolio — only runs when mode=portfolio ───────────
 export async function portfolioRoast(ctx: RoastContext): Promise<PortfolioResult> {
   const prompt = `You are a Hiring Manager who has seen thousands of portfolios. ${getRoastTone(ctx.roastLevel)}
 ${buildContext(ctx, 2000)}
@@ -397,12 +379,11 @@ ${buildContext(ctx, 2000)}
 Return ONLY this JSON:
 {"overallScore":0,"firstImpression":0,"caseStudyDepth":0,"designTaste":0,"skillProof":0,"ctaScore":0,"summary":"","topIssues":[],"recruiterVerdict":""}`;
 
-  const raw = await callGemini(prompt, { jsonMode: true, maxTokens: 1500 });
+  const raw = await callCerebras(prompt, { jsonMode: true });
   return normalizePortfolio(parseJSON(raw, {}));
 }
 
-// ── Backwards-compat exports (used by existing pages) ─────────────────────
-// These are kept for compatibility but are no longer called by the API route.
+// ── Backwards-compat exports ───────────────────────────────────────────────
 export async function auditProduct(ctx: RoastContext): Promise<AuditResult> {
   return (await runMegaBatch(ctx)).audit;
 }

@@ -9,7 +9,7 @@ import {
   RoastContext,
   RoastLevel,
   FullRoastResult,
-} from "@/lib/gemini";
+} from "@/lib/cerebras";
 
 function generateId(length = 12): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -185,11 +185,11 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Roast API error:", err);
     const msg = err instanceof Error ? err.message : "Unknown error";
-    if (msg.includes("GEMINI_API_KEY") || msg.includes("api_key") || msg.includes("API_KEY_INVALID")) {
-      return NextResponse.json({ error: "Invalid or missing Gemini API key. Get one free at aistudio.google.com" }, { status: 500 });
+    if (msg.includes("CEREBRAS_API_KEY") || msg.includes("api_key") || msg.includes("API_KEY_INVALID") || msg.includes("401")) {
+      return NextResponse.json({ error: "Invalid or missing Cerebras API key. Get one at cloud.cerebras.ai" }, { status: 500 });
     }
-    if (msg.includes("rate limit exceeded after retries") || msg.includes("RESOURCE_EXHAUSTED")) {
-      return NextResponse.json({ error: "AI rate limit hit. Please wait 30 seconds and try again — you're on the free tier (15 requests/min)." }, { status: 429 });
+    if (msg.includes("rate limit") || msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
+      return NextResponse.json({ error: "Cerebras rate limit hit. Please wait a few seconds and try again." }, { status: 429 });
     }
     if (msg.includes("worker") || msg.includes("pdf")) {
       return NextResponse.json({ error: "Failed to parse PDF file. Try a different file." }, { status: 400 });
@@ -243,7 +243,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-      const { generateAiroast } = await import("@/lib/gemini");
+      const { generateAiroast } = await import("@/lib/cerebras");
       const ctx: RoastContext = {
         mode: (mode as "product" | "portfolio"),
         roastLevel: roastData.roastLevel,
