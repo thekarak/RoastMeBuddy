@@ -165,6 +165,9 @@ export async function POST(req: NextRequest) {
     if (msg.includes("GEMINI_API_KEY") || msg.includes("api_key") || msg.includes("API_KEY_INVALID")) {
       return NextResponse.json({ error: "Invalid or missing Gemini API key. Get one free at aistudio.google.com" }, { status: 500 });
     }
+    if (msg.includes("rate limit exceeded after retries") || msg.includes("RESOURCE_EXHAUSTED")) {
+      return NextResponse.json({ error: "AI rate limit hit. Please wait 30 seconds and try again — you're on the free tier (15 requests/min)." }, { status: 429 });
+    }
     if (msg.includes("worker") || msg.includes("pdf")) {
       return NextResponse.json({ error: "Failed to parse PDF file. Try a different file." }, { status: 400 });
     }

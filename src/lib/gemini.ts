@@ -1,9 +1,10 @@
 // lib/gemini.ts — Google Gemini via AI Studio
 import { GoogleGenAI } from "@google/genai";
 
-// gemini-2.5-flash: fast + smart (recommended for production)
-// gemini-2.5-pro: slower but deeper reasoning (set GEMINI_MODEL=gemini-2.5-pro to override)
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+// gemini-2.0-flash : 15 RPM free tier — recommended for production
+// gemini-2.5-flash : 5 RPM free tier  — hits quota with 7 calls per roast
+// gemini-2.5-pro   : 5 RPM free tier  — set GEMINI_MODEL=gemini-2.5-pro to use
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 
 function getClient(): GoogleGenAI {
   const key = process.env.GEMINI_API_KEY;
@@ -129,18 +130,42 @@ export interface FullRoastResult {
 }
 
 // ── Core call helper ───────────────────────────────────────────────────────
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function callGemini(prompt: string, jsonMode = true): Promise<string> {
   const ai = getClient();
-  const response = await ai.models.generateContent({
-    model: MODEL,
-    contents: prompt,
-    config: {
-      temperature: 0.8,
-      maxOutputTokens: jsonMode ? 4096 : 8192,
-      ...(jsonMode ? { responseMimeType: "application/json" } : {}),
-    },
-  });
-  return response.text?.trim() ?? "";
+  const MAX_RETRIES = 4;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: MODEL,
+        contents: prompt,
+        config: {
+          temperature: 0.8,
+          maxOutputTokens: jsonMode ? 4096 : 8192,
+          ...(jsonMode ? { responseMimeType: "application/json" } : {}),
+        },
+      });
+      return response.text?.trim() ?? "";
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const is429 = msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota");
+
+      if (is429 && attempt < MAX_RETRIES) {
+        // Extract retry delay from error message if present, otherwise exponential backoff
+        const retryMatch = msg.match(/retry[^\d]*(\d+(?:\.\d+)?)s/i);
+        const waitMs = retryMatch
+          ? Math.ceil(parseFloat(retryMatch[1]) * 1000) + 500
+          : Math.min(5000 * Math.pow(2, attempt), 30000);
+        console.warn(`Gemini 429 — waiting ${waitMs}ms before retry ${attempt + 1}/${MAX_RETRIES}`);
+        await sleep(waitMs);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Gemini API: rate limit exceeded after retries");
 }
 
 // ── Normalizers ────────────────────────────────────────────────────────────
