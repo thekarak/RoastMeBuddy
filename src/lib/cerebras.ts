@@ -3,7 +3,12 @@ const MODEL = "gpt-oss-120b";
 const CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1/chat/completions";
 
 function getApiKey(): string {
-  const key = process.env.CEREBRAS_API_KEY;
+  const key = 
+    process.env.CEREBRAS_API_KEY || 
+    process.env.CEREBERAS_API_KEY || 
+    process.env.CEREBRAS_KEY || 
+    process.env.CEREBERAS_KEY;
+    
   if (!key) throw new Error("CEREBRAS_API_KEY is not set in environment variables");
   return key;
 }
