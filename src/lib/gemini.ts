@@ -126,9 +126,9 @@ export interface FullRoastResult {
 
 const MODELS_POOL = [
   MODEL,
-  "gemini-1.5-flash",
+  "gemini-2.0-flash-lite",
   "gemini-2.5-flash",
-  "gemini-1.5-pro",
+  "gemini-2.5-pro",
 ];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -139,9 +139,8 @@ async function callGemini(
 ): Promise<string> {
   const { jsonMode = true, maxTokens = 3000 } = opts;
   const ai = getClient();
-  const MAX_RETRIES = 1;
 
-  // 1. Try models in the failover pool sequentially without sleeping
+  // 1. Try models in the failover pool sequentially
   for (const currentModel of MODELS_POOL) {
     try {
       const response = await ai.models.generateContent({
@@ -156,18 +155,20 @@ async function callGemini(
       return response.text?.trim() ?? "";
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      const is429 = msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota");
+      const isAuthError = msg.includes("API_KEY_INVALID") || msg.includes("API_KEY") || msg.includes("invalid key");
       
-      if (is429) {
-        console.warn(`Gemini 429 on ${currentModel} — failing over to next model in pool`);
-        continue; // Try next model immediately
+      if (isAuthError) {
+        throw err; // Re-throw authentication issues immediately so they can be fixed
       }
-      throw err; // For other errors (like invalid key), throw immediately
+      
+      // Log error (rate limit, 404, etc.) and proceed to failover
+      console.warn(`Gemini failover: ${currentModel} returned error: ${msg}. Trying next...`);
+      continue;
     }
   }
 
-  // 2. If all models in the pool failed, wait 2 seconds and retry the default model once
-  console.warn("All models in failover pool rate limited. Sleeping 2.5s before final retry...");
+  // 2. If all models in the pool failed, wait 2.5 seconds and retry the default model once
+  console.warn("All models in failover pool rate limited or failed. Sleeping 2.5s before final retry...");
   await sleep(2500);
 
   try {
