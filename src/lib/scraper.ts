@@ -13,6 +13,43 @@ export interface ScrapedData {
 }
 
 export async function scrapeUrl(url: string): Promise<ScrapedData> {
+  // 1. Try Jina Reader first (handles JS single page apps and bypasses Cloudflare)
+  try {
+    const jinaUrl = `https://r.jina.ai/${url}`;
+    const jinaResponse = await fetch(jinaUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "text/plain",
+      },
+      signal: AbortSignal.timeout(4000), // 4 seconds timeout for Jina
+    });
+
+    if (jinaResponse.ok) {
+      const markdown = await jinaResponse.text();
+      if (markdown && markdown.trim().length > 150) {
+        const lines = markdown.split("\n");
+        const titleLine = lines.find((l) => l.startsWith("Title:"));
+        const title = titleLine ? titleLine.replace("Title:", "").trim() : "Project Page";
+        const bodyText = markdown.slice(0, 3000);
+
+        return {
+          title,
+          description: "",
+          headings: [],
+          bodyText,
+          ctaTexts: [],
+          ogTitle: title,
+          ogDescription: "",
+          context: `URL: ${url}\n\nPage Content:\n${bodyText}`,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn("Jina Reader scraping failed, falling back to local Cheerio scraper:", e);
+  }
+
+  // 2. Local Cheerio Scraper Fallback
   const response = await fetch(url, {
     headers: {
       "User-Agent":

@@ -303,6 +303,8 @@ Analyse the following ${ctx.mode} across multiple dimensions simultaneously and 
 
 CRITICAL: Keep all summaries and text explanations under 2 sentences. Keep all list items under 12 words. Be punchy, direct, and concise to avoid response truncation.
 
+CRITICAL SCORE RULE: All scores (overallScore, problemClarity, valueProp, differentiation, positioning, score, visualHierarchy, ctaPlacement, trustSignals, personas[].score, moatScore, fundingReadiness, survivalChance) MUST be integers rated on a 0 to 100 scale (e.g. 78, 92, 45, NOT 0 to 10).
+
 ${buildContext(ctx)}
 
 Return ONLY this JSON structure (no markdown fences, no extra text):
@@ -390,6 +392,8 @@ Return ONLY the roast text. No JSON, no labels, no formatting.`;
 export async function portfolioRoast(ctx: RoastContext): Promise<PortfolioResult> {
   const prompt = `You are a Hiring Manager who has seen thousands of portfolios. ${getRoastTone(ctx.roastLevel)}
 ${buildContext(ctx, 2000)}
+
+CRITICAL SCORE RULE: All scores (overallScore, firstImpression, caseStudyDepth, designTaste, skillProof, ctaScore) MUST be integers rated on a 0 to 100 scale (e.g. 85, NOT 0 to 10).
 
 Return ONLY this JSON:
 {"overallScore":0,"firstImpression":0,"caseStudyDepth":0,"designTaste":0,"skillProof":0,"ctaScore":0,"summary":"","topIssues":[],"recruiterVerdict":""}`;

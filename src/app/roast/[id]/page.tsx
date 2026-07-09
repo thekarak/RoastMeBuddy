@@ -3,14 +3,14 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import html2canvas from "html2canvas";
-import type { FullRoastResult, AuditResult, PersonaResult, SharkTankResult, FuneralResult, ActionPlanResult, PortfolioResult } from "@/lib/mistral";
+import type { FullRoastResult, AuditResult, PersonaResult, SharkTankResult, FuneralResult, ActionPlanResult, PortfolioResult } from "@/lib/cerebras";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function ScoreBar({ label, value, color = "#FF4500" }: { label: string; value: number; color?: string }) {
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs font-mono">
-        <span className="text-[#71717A]">{label}</span>
+        <span className="text-[#71717A]" style={{ color: "#71717A" }}>{label}</span>
         <span style={{ color }}>{value}/100</span>
       </div>
       <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
@@ -33,8 +33,8 @@ function ScoreRing({ score, size = 120, color = "#FF4500" }: { score: number; si
           style={{ filter: `drop-shadow(0 0 8px ${color}88)`, transition: "stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)" }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span style={{ fontFamily: "Syne, sans-serif" }} className="text-2xl font-bold text-white">{score}</span>
-        <span className="text-[10px] text-[#71717A] font-mono">/ 100</span>
+        <span style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-2xl font-bold">{score}</span>
+        <span className="text-[10px] text-[#71717A] font-mono" style={{ color: "#71717A" }}>/ 100</span>
       </div>
     </div>
   );
@@ -47,9 +47,15 @@ function Tag({ type, label }: { type: "critical" | "warning" | "good" | "info"; 
     good:     "bg-green-500/10 text-green-400 border-green-500/20",
     info:     "bg-blue-500/10 text-blue-400 border-blue-500/20",
   };
+  const clr = {
+    critical: "#F87171",
+    warning:  "#FBBF24",
+    good:     "#34D399",
+    info:     "#60A5FA",
+  };
   const icons = { critical: "🔴", warning: "🟡", good: "🟢", info: "🔵" };
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-mono ${styles[type]}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-mono ${styles[type]}`} style={{ color: clr[type], borderColor: `${clr[type]}25`, background: `${clr[type]}08` }}>
       {icons[type]} {label}
     </span>
   );
@@ -63,7 +69,7 @@ function IssueRow({ text, type }: { text: string; type: "critical" | "warning" |
       <span className="flex-shrink-0 mt-0.5">
         {type === "critical" ? "🔴" : type === "warning" ? "🟡" : "🟢"}
       </span>
-      <p className="text-sm text-[#F1F1F3] leading-relaxed">{text}</p>
+      <p className="text-sm text-[#F1F1F3] leading-relaxed" style={{ color: "#F1F1F3" }}>{text}</p>
     </div>
   );
 }
@@ -79,10 +85,10 @@ function RoastPanel({ text, loading }: { text: string; loading: boolean }) {
           <div className="flex items-center gap-3 mb-6">
             <span className="text-4xl">{loading ? "⏳" : "🎤"}</span>
             <div>
-              <h3 style={{ fontFamily: "Syne, sans-serif" }} className="text-2xl font-bold text-white">
+              <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-2xl font-bold">
                 {loading ? "Generating the Roast..." : "The Roast"}
               </h3>
-              <p className="text-xs text-[#71717A] font-mono">
+              <p className="text-xs text-[#71717A] font-mono" style={{ color: "#71717A" }}>
                 {loading ? "AI is crafting pure verbal destruction, please wait..." : "Professional comedy roast — no filters, no mercy"}
               </p>
             </div>
@@ -98,7 +104,7 @@ function RoastPanel({ text, loading }: { text: string; loading: boolean }) {
           ) : (
             <div className="prose prose-invert max-w-none">
               {(text || "The product is so boring even the AI fell asleep.").split("\n").filter(Boolean).map((paragraph, i, arr) => (
-                <p key={i} className="text-base md:text-lg leading-relaxed text-[#F1F1F3] mb-4 last:mb-0" style={{ fontFamily: "Georgia, serif", fontStyle: i === arr.length - 1 ? "italic" : "normal" }}>
+                <p key={i} className="text-base md:text-lg leading-relaxed text-[#F1F1F3] mb-4 last:mb-0" style={{ color: "#F1F1F3", fontFamily: "Georgia, serif", fontStyle: i === arr.length - 1 ? "italic" : "normal" }}>
                   {paragraph}
                 </p>
               ))}
@@ -116,8 +122,8 @@ function AuditPanel({ data }: { data: AuditResult }) {
       <div className="glass rounded-2xl p-6 border border-white/[0.06] flex flex-col md:flex-row gap-6 items-start">
         <ScoreRing score={data.overallScore} size={130} />
         <div className="flex-1 space-y-4">
-          <h3 style={{ fontFamily: "Syne, sans-serif" }} className="text-xl font-bold text-white">Overall Audit</h3>
-          <p className="text-[#71717A] text-sm leading-relaxed">{data.summary}</p>
+          <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-xl font-bold">Overall Audit</h3>
+          <p className="text-[#71717A] text-sm leading-relaxed" style={{ color: "#71717A" }}>{data.summary}</p>
           <div className="space-y-3">
             <ScoreBar label="Problem Clarity" value={data.problemClarity} color="#FF4500" />
             <ScoreBar label="Value Proposition" value={data.valueProp} color="#8B5CF6" />
@@ -128,18 +134,18 @@ function AuditPanel({ data }: { data: AuditResult }) {
       </div>
       <div className="grid md:grid-cols-2 gap-4">
         <div className="glass rounded-2xl p-5 border border-white/[0.06]">
-          <h4 className="text-xs font-mono text-green-400 uppercase tracking-wider mb-4">✅ Strengths</h4>
+          <h4 className="text-xs font-mono text-green-400 uppercase tracking-wider mb-4" style={{ color: "#4ADE80" }}>✅ Strengths</h4>
           <ul className="space-y-2">
             {data.strengths.map((s, i) => (
-              <li key={i} className="flex gap-2 text-sm text-[#F1F1F3]"><span className="text-green-400 flex-shrink-0">→</span>{s}</li>
+              <li key={i} className="flex gap-2 text-sm text-[#F1F1F3]" style={{ color: "#F1F1F3" }}><span className="text-green-400 flex-shrink-0" style={{ color: "#4ADE80" }}>→</span>{s}</li>
             ))}
           </ul>
         </div>
         <div className="glass rounded-2xl p-5 border border-white/[0.06]">
-          <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider mb-4">❌ Weaknesses</h4>
+          <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider mb-4" style={{ color: "#F87171" }}>❌ Weaknesses</h4>
           <ul className="space-y-2">
             {data.weaknesses.map((w, i) => (
-              <li key={i} className="flex gap-2 text-sm text-[#F1F1F3]"><span className="text-red-400 flex-shrink-0">→</span>{w}</li>
+              <li key={i} className="flex gap-2 text-sm text-[#F1F1F3]" style={{ color: "#F1F1F3" }}><span className="text-red-400 flex-shrink-0" style={{ color: "#F87171" }}>→</span>{w}</li>
             ))}
           </ul>
         </div>
@@ -165,16 +171,16 @@ function PersonasPanel({ data }: { data: PersonaResult[] }) {
           </div>
           <div className="space-y-3">
             <div className="glass rounded-xl p-4 border border-white/[0.04]">
-              <span className="text-xs font-mono text-[#71717A] uppercase tracking-wider block mb-1">First Impression</span>
-              <p className="text-sm text-[#F1F1F3]">{p.firstImpression}</p>
+              <span className="text-xs font-mono text-[#71717A] uppercase tracking-wider block mb-1" style={{ color: "#71717A" }}>First Impression</span>
+              <p className="text-sm text-[#F1F1F3]" style={{ color: "#F1F1F3" }}>{p.firstImpression}</p>
             </div>
             <div className="glass rounded-xl p-4 border border-white/[0.04]" style={{ borderColor: `${p.color}20` }}>
               <span className="text-xs font-mono uppercase tracking-wider block mb-1" style={{ color: p.color }}>Main Objection</span>
-              <p className="text-sm text-[#F1F1F3]">{p.mainObjection}</p>
+              <p className="text-sm text-[#F1F1F3]" style={{ color: "#F1F1F3" }}>{p.mainObjection}</p>
             </div>
             <div className="flex items-center gap-2 pt-1">
-              <span className="text-xs font-mono text-[#71717A]">Verdict:</span>
-              <span className="text-sm text-[#F1F1F3] italic">&ldquo;{p.verdict}&rdquo;</span>
+              <span className="text-xs font-mono text-[#71717A]" style={{ color: "#71717A" }}>Verdict:</span>
+              <span className="text-sm text-[#F1F1F3] italic" style={{ color: "#F1F1F3" }}>&ldquo;{p.verdict}&rdquo;</span>
             </div>
           </div>
         </div>
@@ -189,31 +195,31 @@ function SharkTankPanel({ data }: { data: SharkTankResult }) {
       {/* Verdict */}
       <div className="glass rounded-2xl p-6 border border-red-500/20 text-center">
         <span className="text-4xl block mb-3">🦈</span>
-        <h3 style={{ fontFamily: "Syne, sans-serif" }} className="text-2xl font-bold text-white mb-2">Funding Verdict</h3>
-        <p className="text-xl text-red-400 font-semibold italic">&ldquo;{data.fundingVerdict}&rdquo;</p>
+        <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-2xl font-bold mb-2">Funding Verdict</h3>
+        <p className="text-xl text-red-400 font-semibold italic" style={{ color: "#F87171" }}>&ldquo;{data.fundingVerdict}&rdquo;</p>
         <div className="mt-4">
           <ScoreBar label="Funding Readiness" value={data.fundingReadiness} color="#EF4444" />
         </div>
       </div>
       {/* Questions */}
       <div className="space-y-3">
-        <h4 className="text-xs font-mono text-[#71717A] uppercase tracking-wider">💣 Tough Questions You&apos;ll Face</h4>
+        <h4 className="text-xs font-mono text-[#71717A] uppercase tracking-wider" style={{ color: "#71717A" }}>💣 Tough Questions You&apos;ll Face</h4>
         {data.questions.map((q, i) => (
           <div key={i} className="glass rounded-xl p-5 border border-white/[0.06]">
-            <p className="text-white font-semibold mb-2">&ldquo;{q.question}&rdquo;</p>
-            <p className="text-xs text-[#71717A] font-mono"><span className="text-[#F97316]">↳ Why they ask: </span>{q.concern}</p>
+            <p className="text-white font-semibold mb-2" style={{ color: "#FFFFFF" }}>&ldquo;{q.question}&rdquo;</p>
+            <p className="text-xs text-[#71717A] font-mono" style={{ color: "#71717A" }}><span className="text-[#F97316]" style={{ color: "#F97316" }}>↳ Why they ask: </span>{q.concern}</p>
           </div>
         ))}
       </div>
       {/* Market + Moat */}
       <div className="grid md:grid-cols-2 gap-4">
         <div className="glass rounded-2xl p-5 border border-white/[0.06]">
-          <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider mb-3">⚠️ Market Risk</h4>
-          <p className="text-sm text-[#F1F1F3] leading-relaxed">{data.marketRisk}</p>
+          <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider mb-3" style={{ color: "#F87171" }}>⚠️ Market Risk</h4>
+          <p className="text-sm text-[#F1F1F3] leading-relaxed" style={{ color: "#F1F1F3" }}>{data.marketRisk}</p>
         </div>
         <div className="glass rounded-2xl p-5 border border-white/[0.06]">
-          <h4 className="text-xs font-mono text-purple-400 uppercase tracking-wider mb-3">🏰 Moat Analysis</h4>
-          <p className="text-sm text-[#F1F1F3] leading-relaxed">{data.moatAnalysis}</p>
+          <h4 className="text-xs font-mono text-purple-400 uppercase tracking-wider mb-3" style={{ color: "#C084FC" }}>🏰 Moat Analysis</h4>
+          <p className="text-sm text-[#F1F1F3] leading-relaxed" style={{ color: "#F1F1F3" }}>{data.moatAnalysis}</p>
           <div className="mt-3">
             <ScoreBar label="Moat Score" value={data.moatScore} color="#8B5CF6" />
           </div>
@@ -229,17 +235,17 @@ function FuneralPanel({ data }: { data: FuneralResult }) {
       {/* Tombstone header */}
       <div className="glass rounded-2xl p-8 border border-white/[0.06] text-center bg-gradient-to-b from-[#1C1C26]/80 to-transparent">
         <span className="text-5xl block mb-4">⚰️</span>
-        <h3 style={{ fontFamily: "Syne, sans-serif" }} className="text-2xl font-bold text-white mb-2">Product Funeral™</h3>
-        <div className="inline-block border border-white/10 rounded-xl px-6 py-3 mt-2">
-          <p className="text-[#71717A] text-xs font-mono">DIED</p>
-          <p className="text-white font-semibold">{data.timeOfDeath}</p>
+        <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-2xl font-bold mb-2">Product Funeral™</h3>
+        <div className="inline-block border border-white/10 rounded-xl px-6 py-3 mt-2" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+          <p className="text-[#71717A] text-xs font-mono" style={{ color: "#71717A" }}>DIED</p>
+          <p className="text-white font-semibold" style={{ color: "#FFFFFF" }}>{data.timeOfDeath}</p>
         </div>
-        <p className="mt-4 text-[#F97316] italic text-lg">&ldquo;{data.epitaph}&rdquo;</p>
+        <p className="mt-4 text-[#F97316] italic text-lg" style={{ color: "#F97316" }}>&ldquo;{data.epitaph}&rdquo;</p>
       </div>
       {/* Cause */}
       <div className="glass rounded-2xl p-5 border border-red-500/20">
-        <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider mb-3">💀 Cause of Death</h4>
-        <p className="text-sm text-[#F1F1F3] leading-relaxed">{data.causeOfDeath}</p>
+        <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider mb-3" style={{ color: "#F87171" }}>💀 Cause of Death</h4>
+        <p className="text-sm text-[#F1F1F3] leading-relaxed" style={{ color: "#F1F1F3" }}>{data.causeOfDeath}</p>
       </div>
       {/* Survival */}
       <div className="glass rounded-2xl p-5 border border-white/[0.06]">
@@ -247,17 +253,17 @@ function FuneralPanel({ data }: { data: FuneralResult }) {
       </div>
       {/* Missed signals */}
       <div className="space-y-3">
-        <h4 className="text-xs font-mono text-[#71717A] uppercase tracking-wider">📡 Missed Signals</h4>
+        <h4 className="text-xs font-mono text-[#71717A] uppercase tracking-wider" style={{ color: "#71717A" }}>📡 Missed Signals</h4>
         {data.missedSignals.map((s, i) => (
           <div key={i} className="flex gap-3 items-start glass rounded-xl p-4 border border-white/[0.06]">
-            <span className="text-red-400 flex-shrink-0 font-mono text-sm">0{i + 1}</span>
-            <p className="text-sm text-[#F1F1F3]">{s}</p>
+            <span className="text-red-400 flex-shrink-0 font-mono text-sm" style={{ color: "#F87171" }}>0{i + 1}</span>
+            <p className="text-sm text-[#F1F1F3]" style={{ color: "#F1F1F3" }}>{s}</p>
           </div>
         ))}
       </div>
       {/* Prevention */}
       <div className="space-y-3">
-        <h4 className="text-xs font-mono text-green-400 uppercase tracking-wider">🛡️ Prevention Plan (Do This Now)</h4>
+        <h4 className="text-xs font-mono text-green-400 uppercase tracking-wider" style={{ color: "#4ADE80" }}>🛡️ Prevention Plan (Do This Now)</h4>
         {data.preventionPlan.map((p, i) => (
           <IssueRow key={i} text={p} type="good" />
         ))}
@@ -283,7 +289,7 @@ function ActionPlanPanel({ data }: { data: ActionPlanResult }) {
             <div className="space-y-3">
               {data[col.key].map((item, i) => (
                 <div key={i} className="glass rounded-xl p-3.5 border border-white/[0.04]">
-                  <p className="text-sm text-[#F1F1F3] mb-2 leading-relaxed">{item.action}</p>
+                  <p className="text-sm text-[#F1F1F3] mb-2 leading-relaxed" style={{ color: "#F1F1F3" }}>{item.action}</p>
                   <div className="flex gap-2">
                     <Tag type={item.impact === "High" ? "critical" : item.impact === "Medium" ? "warning" : "info"} label={`Impact: ${item.impact}`} />
                     <Tag type={item.effort === "Low" ? "good" : item.effort === "Medium" ? "warning" : "critical"} label={`Effort: ${item.effort}`} />
@@ -304,8 +310,8 @@ function PortfolioPanel({ data }: { data: PortfolioResult }) {
       <div className="glass rounded-2xl p-6 border border-white/[0.06] flex flex-col md:flex-row gap-6 items-start">
         <ScoreRing score={data.overallScore} size={130} color="#8B5CF6" />
         <div className="flex-1 space-y-3">
-          <h3 style={{ fontFamily: "Syne, sans-serif" }} className="text-xl font-bold text-white">Hiring Manager Mode™</h3>
-          <p className="text-[#71717A] text-sm leading-relaxed">{data.summary}</p>
+          <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-xl font-bold">Hiring Manager Mode™</h3>
+          <p className="text-[#71717A] text-sm leading-relaxed" style={{ color: "#71717A" }}>{data.summary}</p>
           <ScoreBar label="First Impression" value={data.firstImpression} color="#FF4500" />
           <ScoreBar label="Case Study Depth" value={data.caseStudyDepth} color="#8B5CF6" />
           <ScoreBar label="Design Taste" value={data.designTaste} color="#F97316" />
@@ -314,11 +320,11 @@ function PortfolioPanel({ data }: { data: PortfolioResult }) {
         </div>
       </div>
       <div className="glass rounded-2xl p-5 border border-purple-500/20">
-        <h4 className="text-xs font-mono text-purple-400 uppercase tracking-wider mb-3">💼 Recruiter Verdict</h4>
-        <p className="text-[#F1F1F3] italic">&ldquo;{data.recruiterVerdict}&rdquo;</p>
+        <h4 className="text-xs font-mono text-purple-400 uppercase tracking-wider mb-3" style={{ color: "#C084FC" }}>💼 Recruiter Verdict</h4>
+        <p className="text-[#F1F1F3] italic" style={{ color: "#F1F1F3" }}>&ldquo;{data.recruiterVerdict}&rdquo;</p>
       </div>
       <div className="space-y-3">
-        <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider">Top Issues to Fix</h4>
+        <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider" style={{ color: "#F87171" }}>Top Issues to Fix</h4>
         {data.topIssues.map((issue, i) => <IssueRow key={i} text={issue} type="warning" />)}
       </div>
     </div>
