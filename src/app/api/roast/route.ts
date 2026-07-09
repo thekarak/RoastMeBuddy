@@ -150,23 +150,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ id, result: cachedFull, cached: true });
     }
 
-    // ── 2-call parallel orchestration (was 3 calls, originally 7) ──────────
-    // Call 1: runMegaBatch (Audit + UX + Personas + SharkTank + Funeral + ActionPlan) — 1 API call
-    // Call 2: generateAiroast narrative (1 API call)
-    // Runs both concurrently for sub-6 second execution speed.
-    const [megaBatch, aiRoast] = await Promise.all([
-      runMegaBatch(ctx),
-      generateAiroast(ctx),
-    ]);
-
+    // ── 1-call mega-batch orchestration (was 2 calls, originally 7) ───────
+    // We defer generateAiroast to a separate lazy GET call to keep initial
+    // request well under the Vercel Hobby 10-second serverless execution limit.
+    const megaBatch = await runMegaBatch(ctx);
     const { audit, ux, personas, sharkTank, funeral, actionPlan } = megaBatch;
 
-    // Call 3 (optional): portfolio mode only
+    // Call 2 (optional): portfolio mode only
     const portfolio = mode === "portfolio" ? await portfolioRoast(ctx) : undefined;
 
     const fullResult: FullRoastResult = {
-      audit, ux, personas, sharkTank, funeral, actionPlan, roastLevel, aiRoast,
+      audit,
+      ux,
+      personas,
+      sharkTank,
+      funeral,
+      actionPlan,
+      roastLevel,
+      aiRoast: "", // Populated lazily on demand
       ...(portfolio ? { portfolio } : {}),
+      scrapedText, // Cached to allow lazy generation
+      description,
     };
 
     // Store in URL cache for next identical request
@@ -194,23 +198,79 @@ export async function POST(req: NextRequest) {
   }
 }
 
+async function updateRoastInDb(id: string, result: unknown) {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    const { db } = await import("@/lib/db");
+    const { roasts } = await import("@/lib/schema");
+    const { eq } = await import("drizzle-orm");
+    await db.update(roasts).set({ result }).where(eq(roasts.id, id));
+  } catch (e) {
+    console.error("DB update failed (non-fatal):", e);
+  }
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
+  const type = searchParams.get("type");
+  
   if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
-  // Check in-memory cache first
-  const cached = resultCache.get(id);
-  if (cached && Date.now() - cached.createdAt < CACHE_TTL_MS) {
-    return NextResponse.json({ id, result: cached.result });
+  // 1. Get the roast from cache or database
+  let cachedEntry = resultCache.get(id);
+  let roastData: FullRoastResult | null = null;
+  let mode = "product";
+  let inputUrl: string | undefined = undefined;
+
+  if (cachedEntry && Date.now() - cachedEntry.createdAt < CACHE_TTL_MS) {
+    roastData = cachedEntry.result as FullRoastResult;
+  } else {
+    const dbRoast = await getRoastById(id);
+    if (dbRoast) {
+      roastData = dbRoast.result as FullRoastResult;
+      mode = dbRoast.mode;
+      inputUrl = dbRoast.inputUrl || undefined;
+    }
   }
-  resultCache.delete(id); // expired
 
-  // Fallback to database
-  const roast = await getRoastById(id);
-  if (!roast) return NextResponse.json({ error: "Roast not found" }, { status: 404 });
+  if (!roastData) return NextResponse.json({ error: "Roast not found" }, { status: 404 });
 
-  return NextResponse.json({ id: roast.id, result: roast.result });
+  // 2. If client is requesting lazy AI Roast text narrative
+  if (type === "narrative") {
+    if (roastData.aiRoast) {
+      return NextResponse.json({ aiRoast: roastData.aiRoast });
+    }
+
+    try {
+      const { generateAiroast } = await import("@/lib/gemini");
+      const ctx: RoastContext = {
+        mode: (mode as "product" | "portfolio"),
+        roastLevel: roastData.roastLevel,
+        url: inputUrl,
+        scrapedText: roastData.scrapedText || "",
+        description: roastData.description || "",
+      };
+
+      const generatedRoast = await generateAiroast(ctx);
+      
+      // Update data structure
+      roastData.aiRoast = generatedRoast;
+
+      // Save back to in-memory cache
+      resultCache.set(id, { result: roastData, createdAt: Date.now() });
+      
+      // Save back to PostgreSQL database
+      await updateRoastInDb(id, roastData);
+
+      return NextResponse.json({ aiRoast: generatedRoast });
+    } catch (err) {
+      console.error("Lazy aiRoast generation failed:", err);
+      return NextResponse.json({ error: "Failed to generate AI roast narrative." }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({ id, result: roastData });
 }
 
 export const maxDuration = 60; // Vercel max for hobby plan

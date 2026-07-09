@@ -120,6 +120,8 @@ export interface FullRoastResult {
   roastLevel: RoastLevel;
   aiRoast: string;
   portfolio?: PortfolioResult;
+  scrapedText?: string;
+  description?: string;
 }
 
 // ── Core call helper ───────────────────────────────────────────────────────

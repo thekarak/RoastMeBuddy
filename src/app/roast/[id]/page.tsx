@@ -69,7 +69,7 @@ function IssueRow({ text, type }: { text: string; type: "critical" | "warning" |
 }
 
 // ── Tab panels ─────────────────────────────────────────────────────────────
-function RoastPanel({ text }: { text: string }) {
+function RoastPanel({ text, loading }: { text: string; loading: boolean }) {
   return (
     <div className="space-y-6 fade-in-up">
       <div className="glass rounded-2xl p-8 border border-white/[0.06] relative overflow-hidden">
@@ -77,19 +77,33 @@ function RoastPanel({ text }: { text: string }) {
         <div className="absolute -bottom-24 -left-24 w-48 h-48 rounded-full blur-3xl opacity-10" style={{ background: "#F97316" }} />
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-6">
-            <span className="text-4xl">🎤</span>
+            <span className="text-4xl">{loading ? "⏳" : "🎤"}</span>
             <div>
-              <h3 style={{ fontFamily: "Syne, sans-serif" }} className="text-2xl font-bold text-white">The Roast</h3>
-              <p className="text-xs text-[#71717A] font-mono">Professional comedy roast — no filters, no mercy</p>
+              <h3 style={{ fontFamily: "Syne, sans-serif" }} className="text-2xl font-bold text-white">
+                {loading ? "Generating the Roast..." : "The Roast"}
+              </h3>
+              <p className="text-xs text-[#71717A] font-mono">
+                {loading ? "AI is crafting pure verbal destruction, please wait..." : "Professional comedy roast — no filters, no mercy"}
+              </p>
             </div>
           </div>
-          <div className="prose prose-invert max-w-none">
-            {text.split("\n").filter(Boolean).map((paragraph, i) => (
-              <p key={i} className="text-base md:text-lg leading-relaxed text-[#F1F1F3] mb-4 last:mb-0" style={{ fontFamily: "Georgia, serif", fontStyle: i === text.split("\n").filter(Boolean).length - 1 ? "italic" : "normal" }}>
-                {paragraph}
-              </p>
-            ))}
-          </div>
+          {loading ? (
+            <div className="space-y-4">
+              <div className="h-4 bg-white/5 rounded w-full animate-pulse" />
+              <div className="h-4 bg-white/5 rounded w-5/6 animate-pulse" />
+              <div className="h-4 bg-white/5 rounded w-4/5 animate-pulse" />
+              <div className="h-4 bg-white/5 rounded w-full animate-pulse" />
+              <div className="h-4 bg-white/5 rounded w-3/4 animate-pulse" />
+            </div>
+          ) : (
+            <div className="prose prose-invert max-w-none">
+              {(text || "The product is so boring even the AI fell asleep.").split("\n").filter(Boolean).map((paragraph, i, arr) => (
+                <p key={i} className="text-base md:text-lg leading-relaxed text-[#F1F1F3] mb-4 last:mb-0" style={{ fontFamily: "Georgia, serif", fontStyle: i === arr.length - 1 ? "italic" : "normal" }}>
+                  {paragraph}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -377,7 +391,40 @@ export default function RoastResultPage() {
   const [activeTab, setActiveTab] = useState("audit");
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [aiRoastText, setAiRoastText] = useState("");
+  const [loadingRoast, setLoadingRoast] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
+
+  // Sync state with loaded result
+  useEffect(() => {
+    if (result) {
+      setAiRoastText(result.aiRoast || "");
+    }
+  }, [result]);
+
+  // Lazy generation effect when "roast" tab is selected
+  useEffect(() => {
+    if (activeTab === "roast" && !aiRoastText && !loadingRoast && id) {
+      setLoadingRoast(true);
+      fetch(`/api/roast?id=${id}&type=narrative`)
+        .then((res) => {
+          if (!res.ok) throw new Error("Narrative fetch failed");
+          return res.json();
+        })
+        .then((data) => {
+          if (data.aiRoast) {
+            setAiRoastText(data.aiRoast);
+            if (result) {
+              const updated = { ...result, aiRoast: data.aiRoast };
+              setResult(updated);
+              sessionStorage.setItem(`roast_${id}`, JSON.stringify(updated));
+            }
+          }
+        })
+        .catch((err) => console.error("Failed to load AI roast narrative:", err))
+        .finally(() => setLoadingRoast(false));
+    }
+  }, [activeTab, aiRoastText, loadingRoast, id, result]);
 
   useEffect(() => {
     async function load() {
@@ -543,7 +590,7 @@ export default function RoastResultPage() {
         {/* Panel content */}
         <div ref={captureRef} className="rounded-2xl">
           {activeTab === "audit"     && <AuditPanel data={result.audit} />}
-          {activeTab === "roast"    && <RoastPanel text={result.aiRoast} />}
+          {activeTab === "roast"    && <RoastPanel text={aiRoastText} loading={loadingRoast} />}
           {activeTab === "personas"  && <PersonasPanel data={result.personas} />}
           {activeTab === "sharktank" && <SharkTankPanel data={result.sharkTank} />}
           {activeTab === "funeral"   && <FuneralPanel data={result.funeral} />}
