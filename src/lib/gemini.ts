@@ -336,8 +336,12 @@ Return ONLY this JSON structure (no markdown fences, no extra text):
 }`;
 
   const raw = await callGemini(prompt, { jsonMode: true, maxTokens: 4000 });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const d = parseJSON<any>(raw, {});
+  const d = parseJSON<any>(raw, null);
+
+  if (!d || !d.audit || !d.ux) {
+    console.error("Gemini failed to output valid JSON. Raw response:", raw);
+    throw new Error(`AI generated invalid response structure. Raw: ${raw.slice(0, 150)}...`);
+  }
 
   return {
     audit: normalizeAudit(d?.audit || {}),
