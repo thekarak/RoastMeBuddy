@@ -253,7 +253,7 @@ export async function GET(req: NextRequest) {
     try {
       const { generateAiroast } = await import("@/lib/cerebras");
       const ctx: RoastContext = {
-        mode: (mode as "product" | "portfolio"),
+        mode: roastData.portfolio ? "portfolio" : "product",
         roastLevel: roastData.roastLevel,
         url: inputUrl,
         scrapedText: roastData.scrapedText || "",

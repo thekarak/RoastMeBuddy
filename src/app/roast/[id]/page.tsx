@@ -425,9 +425,14 @@ export default function RoastResultPage() {
               setResult(updated);
               sessionStorage.setItem(`roast_${id}`, JSON.stringify(updated));
             }
+          } else {
+            setAiRoastText("The comedy roast narrative is unavailable for this shared link.");
           }
         })
-        .catch((err) => console.error("Failed to load AI roast narrative:", err))
+        .catch((err) => {
+          console.error("Failed to load AI roast narrative:", err);
+          setAiRoastText("The comedy roast narrative is unavailable for this shared link.");
+        })
         .finally(() => setLoadingRoast(false));
     }
   }, [activeTab, aiRoastText, loadingRoast, id, result]);
