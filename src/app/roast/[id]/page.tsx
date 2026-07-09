@@ -498,6 +498,44 @@ export default function RoastResultPage() {
         scale: 2,
         useCORS: true,
         logging: false,
+        onclone: (clonedDoc, element) => {
+          // Force all glass cards to have solid dark backgrounds in the export
+          const glassCards = element.querySelectorAll(".glass");
+          glassCards.forEach((card: any) => {
+            card.style.background = "#14141E";
+            card.style.backgroundColor = "#14141E";
+          });
+
+          // Force bright text colors on the cloned element for canvas render
+          const headings = element.querySelectorAll("h1, h2, h3, h4");
+          headings.forEach((h: any) => {
+            h.style.setProperty("color", "#FFFFFF", "important");
+          });
+
+          const paragraphs = element.querySelectorAll("p");
+          paragraphs.forEach((p: any) => {
+            // If it's a subtitle/muted text, make it soft grey, otherwise bright white/grey
+            if (p.className.includes("text-[#71717A]") || p.className.includes("text-xs") || p.style.color === "rgb(113, 113, 122)") {
+              p.style.setProperty("color", "#9CA3AF", "important");
+            } else {
+              p.style.setProperty("color", "#F1F1F3", "important");
+            }
+          });
+
+          const listItems = element.querySelectorAll("li");
+          listItems.forEach((li: any) => {
+            li.style.setProperty("color", "#F1F1F3", "important");
+          });
+
+          const spans = element.querySelectorAll("span");
+          spans.forEach((span: any) => {
+            if (span.className.includes("text-white") || span.className.includes("font-bold") || span.style.color === "rgb(255, 255, 255)") {
+              span.style.setProperty("color", "#FFFFFF", "important");
+            } else if (span.className.includes("text-[#71717A]")) {
+              span.style.setProperty("color", "#9CA3AF", "important");
+            }
+          });
+        }
       });
       const link = document.createElement("a");
       link.download = `cvroast-${id}.png`;
