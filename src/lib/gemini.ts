@@ -124,7 +124,13 @@ export interface FullRoastResult {
   description?: string;
 }
 
-// ── Core call helper ───────────────────────────────────────────────────────
+const MODELS_POOL = [
+  MODEL,
+  "gemini-1.5-flash",
+  "gemini-2.5-flash",
+  "gemini-1.5-pro",
+];
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function callGemini(
@@ -135,10 +141,11 @@ async function callGemini(
   const ai = getClient();
   const MAX_RETRIES = 1;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  // 1. Try models in the failover pool sequentially without sleeping
+  for (const currentModel of MODELS_POOL) {
     try {
       const response = await ai.models.generateContent({
-        model: MODEL,
+        model: currentModel,
         contents: prompt,
         config: {
           temperature: 0.8,
@@ -150,19 +157,34 @@ async function callGemini(
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       const is429 = msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota");
-      if (is429 && attempt < MAX_RETRIES) {
-        const retryMatch = msg.match(/retry[^\d]*(\d+(?:\.\d+)?)s/i);
-        const waitMs = retryMatch
-          ? Math.ceil(parseFloat(retryMatch[1]) * 1000) + 500
-          : Math.min(6000 * Math.pow(2, attempt), 32000);
-        console.warn(`Gemini 429 — waiting ${waitMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
-        await sleep(waitMs);
-        continue;
+      
+      if (is429) {
+        console.warn(`Gemini 429 on ${currentModel} — failing over to next model in pool`);
+        continue; // Try next model immediately
       }
-      throw err;
+      throw err; // For other errors (like invalid key), throw immediately
     }
   }
-  throw new Error("Gemini API: rate limit exceeded after retries");
+
+  // 2. If all models in the pool failed, wait 2 seconds and retry the default model once
+  console.warn("All models in failover pool rate limited. Sleeping 2.5s before final retry...");
+  await sleep(2500);
+
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL,
+      contents: prompt,
+      config: {
+        temperature: 0.8,
+        maxOutputTokens: maxTokens,
+        ...(jsonMode ? { responseMimeType: "application/json" } : {}),
+      },
+    });
+    return response.text?.trim() ?? "";
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Gemini API: rate limit exceeded on all models after failover. Details: ${msg}`);
+  }
 }
 
 // ── Normalizers ────────────────────────────────────────────────────────────
