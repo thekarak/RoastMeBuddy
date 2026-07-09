@@ -401,10 +401,15 @@ export default function RoastResultPage() {
         return;
       }
       // 3. Fallback: fetch from API
-      const res = await fetch(`/api/roast?id=${id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setResult(data.result);
+      try {
+        const res = await fetch(`/api/roast?id=${id}`);
+        if (res.ok) {
+          const text = await res.text();
+          const data = JSON.parse(text);
+          setResult(data.result);
+        }
+      } catch (e) {
+        console.error("Failed to fetch roast data from API:", e);
       }
       setLoading(false);
     }
