@@ -499,22 +499,36 @@ export default function RoastResultPage() {
         useCORS: true,
         logging: false,
         onclone: (clonedDoc, element) => {
-          // Force all glass cards to have solid dark backgrounds in the export
-          const glassCards = element.querySelectorAll(".glass");
-          glassCards.forEach((card: any) => {
-            card.style.background = "#14141E";
-            card.style.backgroundColor = "#14141E";
+          // 1. Force main container styling (solid dark background + premium poster padding)
+          element.style.setProperty("background", "#0A0A0F", "important");
+          element.style.setProperty("background-color", "#0A0A0F", "important");
+          element.style.setProperty("padding", "32px", "important");
+          element.style.setProperty("border-radius", "24px", "important");
+
+          // 2. Remove prose and prose-invert class overrides
+          const proseEls = element.querySelectorAll(".prose, .prose-invert");
+          proseEls.forEach((el: any) => {
+            el.classList.remove("prose", "prose-invert");
           });
 
-          // Force bright text colors on the cloned element for canvas render
+          // 3. Force all glass cards to have solid dark backgrounds and borders in the export
+          const glassCards = element.querySelectorAll(".glass");
+          glassCards.forEach((card: any) => {
+            card.style.setProperty("background", "#14141E", "important");
+            card.style.setProperty("background-color", "#14141E", "important");
+            card.style.setProperty("border-color", "rgba(255, 255, 255, 0.08)", "important");
+          });
+
+          // 4. Force bright white color on headings
           const headings = element.querySelectorAll("h1, h2, h3, h4");
           headings.forEach((h: any) => {
             h.style.setProperty("color", "#FFFFFF", "important");
           });
 
+          // 5. Force bright readable text on paragraphs and list items
           const paragraphs = element.querySelectorAll("p");
           paragraphs.forEach((p: any) => {
-            // If it's a subtitle/muted text, make it soft grey, otherwise bright white/grey
+            // Muted labels / subtexts
             if (p.className.includes("text-[#71717A]") || p.className.includes("text-xs") || p.style.color === "rgb(113, 113, 122)") {
               p.style.setProperty("color", "#9CA3AF", "important");
             } else {
@@ -527,9 +541,13 @@ export default function RoastResultPage() {
             li.style.setProperty("color", "#F1F1F3", "important");
           });
 
+          // 6. Force bright colors on general text spans (safeguarding score bar / tag colors)
           const spans = element.querySelectorAll("span");
           spans.forEach((span: any) => {
-            if (span.className.includes("text-white") || span.className.includes("font-bold") || span.style.color === "rgb(255, 255, 255)") {
+            if (span.style.color && span.style.color !== "rgb(255, 255, 255)") {
+              return; // Preserve custom colors like red/green score bars
+            }
+            if (span.className.includes("text-white") || span.className.includes("font-bold")) {
               span.style.setProperty("color", "#FFFFFF", "important");
             } else if (span.className.includes("text-[#71717A]")) {
               span.style.setProperty("color", "#9CA3AF", "important");
