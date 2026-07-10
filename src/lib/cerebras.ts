@@ -323,27 +323,27 @@ Distribute scores across the full 0-100 range. Identify specific content element
 
 ${buildContext(ctx)}
 
-Return ONLY this JSON structure (no markdown fences, no extra text):
+Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL numeric values with your actual assessed scores — do NOT copy the example numbers:
 {
   "audit": {
-    "overallScore": 0, "problemClarity": 0, "valueProp": 0, "differentiation": 0, "positioning": 0,
+    "overallScore": 62, "problemClarity": 55, "valueProp": 48, "differentiation": 40, "positioning": 58,
     "summary": "", "strengths": [], "weaknesses": []
   },
   "ux": {
-    "score": 0, "visualHierarchy": 0, "ctaPlacement": 0, "trustSignals": 0,
+    "score": 65, "visualHierarchy": 70, "ctaPlacement": 45, "trustSignals": 50,
     "frictionPoints": [], "criticalIssues": [], "warnings": [], "quickWins": []
   },
   "personas": [
-    {"persona":"${personaDefs[0].name}","emoji":"${personaDefs[0].emoji}","color":"${personaDefs[0].color}","firstImpression":"","mainObjection":"","verdict":"","score":0},
-    {"persona":"${personaDefs[1].name}","emoji":"${personaDefs[1].emoji}","color":"${personaDefs[1].color}","firstImpression":"","mainObjection":"","verdict":"","score":0},
-    {"persona":"${personaDefs[2].name}","emoji":"${personaDefs[2].emoji}","color":"${personaDefs[2].color}","firstImpression":"","mainObjection":"","verdict":"","score":0}
+    {"persona":"${personaDefs[0].name}","emoji":"${personaDefs[0].emoji}","color":"${personaDefs[0].color}","firstImpression":"","mainObjection":"","verdict":"","score":55},
+    {"persona":"${personaDefs[1].name}","emoji":"${personaDefs[1].emoji}","color":"${personaDefs[1].color}","firstImpression":"","mainObjection":"","verdict":"","score":60},
+    {"persona":"${personaDefs[2].name}","emoji":"${personaDefs[2].emoji}","color":"${personaDefs[2].color}","firstImpression":"","mainObjection":"","verdict":"","score":50}
   ],
   "sharkTank": {
     "questions": [{"question":"","concern":""},{"question":"","concern":""},{"question":"","concern":""},{"question":"","concern":""}],
-    "marketRisk": "", "moatAnalysis": "", "moatScore": 0, "fundingVerdict": "", "fundingReadiness": 0
+    "marketRisk": "", "moatAnalysis": "", "moatScore": 45, "fundingVerdict": "", "fundingReadiness": 38
   },
   "funeral": {
-    "causeOfDeath": "", "timeOfDeath": "", "missedSignals": [], "epitaph": "", "preventionPlan": [], "survivalChance": 0
+    "causeOfDeath": "", "timeOfDeath": "", "missedSignals": [], "epitaph": "", "preventionPlan": [], "survivalChance": 42
   },
   "actionPlan": {
     "thisWeek":    [{"action":"","impact":"High","effort":"Low"},{"action":"","impact":"High","effort":"Low"},{"action":"","impact":"High","effort":"Low"}],
@@ -411,13 +411,15 @@ Analyse this CV/portfolio across multiple dimensions and return a SINGLE JSON ob
 
 CRITICAL: Keep all summaries and text explanations under 2 sentences. Keep all list items under 12 words. Be punchy, direct, and concise to avoid response truncation.
 
-CRITICAL SCORE RULE: All scores (overallScore, problemClarity, valueProp, differentiation, positioning, score, visualHierarchy, ctaPlacement, trustSignals, personas[].score) MUST be integers rated on a 0 to 100 scale (e.g. 78, 92, 34, NOT 0 to 10).
+CRITICAL SCORE RULE: All scores MUST be integers rated on a 0 to 100 scale. Base scores on ACTUAL CV content — not a default. A fresh grad with good projects might score 65. A professional with no metrics might score 45. An impressive senior dev scores 85. DO NOT default everything to 30-50.
 
-SCORING RUBRIC — Grade each dimension independently based on actual CV content quality:
+SCORING RUBRIC — Grade each dimension independently based on actual CV content:
 - Exceptional achievements with measurable impact, polished presentation → 75-95
 - Solid experience but generic descriptions, lacks metrics → 50-74
 - Vague, poorly formatted, missing key sections → 10-49
 - Incomplete, broken formatting, or absent → 0-9
+
+IMPORTANT: Scores should VARY across dimensions. A CV can have great layout (75) but poor differentiation (30). Reflect real quality variation.
 
 CV-SPECIFIC DIMENSIONS:
 - overallScore → Overall hireability and CV quality
@@ -432,24 +434,27 @@ UX DIMENSIONS (CV readability & design):
 - ctaPlacement → Visibility of contact info, LinkedIn, GitHub, portfolio links
 - trustSignals → LinkedIn presence, credentials, certifications, endorsements
 
-Distribute scores across the full 0-100 range. Identify specific content elements that justify each score. If the CV shows excellence in one area but flaws in another, reflect that variation.
+ACTION PLAN — All actions MUST be specific CV/career improvement steps. DO NOT give startup or product advice:
+- thisWeek: Quick CV text fixes (reword bullets, add numbers, fix formatting)
+- thisSprint: Medium effort (build projects, rewrite sections, update LinkedIn)
+- thisQuarter: Big career investments (certifications, open source, networking)
 
 ${buildContext(ctx)}
 
-Return ONLY this JSON structure (no markdown fences, no extra text):
+Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL numeric values with your actual assessed scores — do NOT copy the example numbers:
 {
   "audit": {
-    "overallScore": 0, "problemClarity": 0, "valueProp": 0, "differentiation": 0, "positioning": 0,
+    "overallScore": 62, "problemClarity": 55, "valueProp": 48, "differentiation": 40, "positioning": 58,
     "summary": "", "strengths": [], "weaknesses": []
   },
   "ux": {
-    "score": 0, "visualHierarchy": 0, "ctaPlacement": 0, "trustSignals": 0,
+    "score": 65, "visualHierarchy": 70, "ctaPlacement": 45, "trustSignals": 50,
     "frictionPoints": [], "criticalIssues": [], "warnings": [], "quickWins": []
   },
   "personas": [
-    {"persona":"${personaDefs[0].name}","emoji":"${personaDefs[0].emoji}","color":"${personaDefs[0].color}","firstImpression":"","mainObjection":"","verdict":"","score":0},
-    {"persona":"${personaDefs[1].name}","emoji":"${personaDefs[1].emoji}","color":"${personaDefs[1].color}","firstImpression":"","mainObjection":"","verdict":"","score":0},
-    {"persona":"${personaDefs[2].name}","emoji":"${personaDefs[2].emoji}","color":"${personaDefs[2].color}","firstImpression":"","mainObjection":"","verdict":"","score":0}
+    {"persona":"${personaDefs[0].name}","emoji":"${personaDefs[0].emoji}","color":"${personaDefs[0].color}","firstImpression":"","mainObjection":"","verdict":"","score":55},
+    {"persona":"${personaDefs[1].name}","emoji":"${personaDefs[1].emoji}","color":"${personaDefs[1].color}","firstImpression":"","mainObjection":"","verdict":"","score":60},
+    {"persona":"${personaDefs[2].name}","emoji":"${personaDefs[2].emoji}","color":"${personaDefs[2].color}","firstImpression":"","mainObjection":"","verdict":"","score":50}
   ],
   "actionPlan": {
     "thisWeek":    [{"action":"","impact":"High","effort":"Low"},{"action":"","impact":"High","effort":"Low"},{"action":"","impact":"High","effort":"Low"}],
