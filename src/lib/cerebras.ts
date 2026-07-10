@@ -125,14 +125,116 @@ export interface FullRoastResult {
   description?: string;
 }
 
+// ── Local CV scoring engine ───────────────────────────────────────────────
+function computeCVScores(text: string): {
+  overallScore: number; problemClarity: number; valueProp: number;
+  differentiation: number; positioning: number;
+  uxScore: number; visualHierarchy: number; ctaPlacement: number; trustSignals: number;
+} {
+  const t = text.toLowerCase();
+  const wc = text.split(/\s+/).length;
+
+  const hasEmail = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(text);
+  const hasPhone = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/.test(text);
+  const hasLinkedIn = /linkedin/i.test(t);
+  const hasGitHub = /github/i.test(t);
+
+  const hasEducation   = /\b(education|degree|bachelor|master|phd|b\.sc|m\.sc|ba|ma|bs|university|college)\b/i.test(t);
+  const hasExperience  = /\b(experience|employment|work history|professional|career)\b/i.test(t);
+  const hasSkills      = /\b(skills|technologies|competencies|proficiencies|expertise|programming|languages)\b/i.test(t);
+  const hasProjects    = /\b(projects|portfolio|repository|open.?source)\b/i.test(t);
+  const hasCerts       = /\b(certified|certification|license|credential)\b/i.test(t);
+  const sectionCount = [hasEducation, hasExperience, hasSkills, hasProjects, hasCerts].filter(Boolean).length;
+
+  const quantified = (text.match(/\d+%|\$\d+|increased|decreased|improved|reduced|generated|saved|grew|boosted|delivered|achieved|led|managed|spearheaded/gi) || []).length;
+  const actionVerbs = (text.match(/\b(developed|implemented|created|designed|launched|optimized|transformed|built|engineered|architected|established|automated|migrated|scaled|integrated)\b/gi) || []).length;
+
+  const depth = Math.min(1, wc / 400);
+  const hasSections = sectionCount >= 3;
+  const hasMetrics = quantified >= 2;
+
+  const achievementClarity = Math.round(Math.min(92, 20 + quantified * 6 + actionVerbs * 3 + depth * 10));
+  const valueScore = Math.round(Math.min(92, 20 + sectionCount * 8 + (hasMetrics ? 12 : 0) + depth * 8 + (hasLinkedIn ? 5 : 0)));
+  const diffScore = Math.round(Math.min(92, 18 + actionVerbs * 4 + quantified * 4 + (hasProjects ? 8 : 0) + (hasCerts ? 5 : 0)));
+  const posScore = Math.round(Math.min(92, 22 + (hasEmail ? 6 : 0) + (hasPhone ? 4 : 0) + (hasSections ? 10 : 0) + depth * 5));
+  const overall = Math.round((achievementClarity + valueScore + diffScore + posScore) / 4);
+
+  const uxScore = Math.round(Math.min(92, 35 + depth * 15 + (hasSections ? 10 : 0) + ((hasLinkedIn || hasGitHub) ? 5 : 0)));
+  const vh = Math.round(Math.min(92, 30 + depth * 20 + (hasSections ? 10 : 0)));
+  const cta = Math.round(Math.min(92, 20 + (hasEmail ? 15 : 0) + (hasPhone ? 8 : 0) + (hasLinkedIn ? 10 : 0) + (hasGitHub ? 8 : 0)));
+  const trust = Math.round(Math.min(92, 25 + (hasLinkedIn ? 12 : 0) + (hasGitHub ? 8 : 0) + (hasCerts ? 8 : 0) + depth * 5));
+
+  return {
+    overallScore: overall, problemClarity: achievementClarity, valueProp: valueScore,
+    differentiation: diffScore, positioning: posScore,
+    uxScore, visualHierarchy: vh, ctaPlacement: cta, trustSignals: trust,
+  };
+}
+
+function generateCVActionPlan(scores: ReturnType<typeof computeCVScores>): ActionPlanResult {
+  const plan: ActionPlanResult = { thisWeek: [], thisSprint: [], thisQuarter: [] };
+
+  if (scores.problemClarity < 50) {
+    plan.thisWeek.push({ action: "Add quantified achievements to every role — use numbers, percentages, and dollar amounts", impact: "High", effort: "Low" });
+  } else if (scores.problemClarity < 70) {
+    plan.thisWeek.push({ action: "Strengthen weak bullet points with concrete results and metrics", impact: "High", effort: "Low" });
+  } else {
+    plan.thisWeek.push({ action: "Fine-tune achievement descriptions for maximum impact", impact: "Medium", effort: "Low" });
+  }
+
+  if (scores.differentiation < 40) {
+    plan.thisWeek.push({ action: "Add a skills section highlighting technical and soft skills", impact: "High", effort: "Low" });
+    plan.thisSprint.push({ action: "Build a portfolio project that demonstrates your best work", impact: "High", effort: "Medium" });
+  } else if (scores.differentiation < 65) {
+    plan.thisWeek.push({ action: "Highlight unique projects and contributions that set you apart", impact: "High", effort: "Low" });
+    plan.thisSprint.push({ action: "Add relevant certifications and online courses", impact: "Medium", effort: "Medium" });
+  } else {
+    plan.thisWeek.push({ action: "Add a link to your portfolio or GitHub to provide extra proof", impact: "Medium", effort: "Low" });
+  }
+
+  if (scores.positioning < 45) {
+    plan.thisWeek.push({ action: "Write a targeted professional summary aligned with your desired role", impact: "High", effort: "Low" });
+    plan.thisQuarter.push({ action: "Network with professionals in your target industry for referrals", impact: "High", effort: "High" });
+  } else if (scores.positioning < 70) {
+    plan.thisWeek.push({ action: "Tailor your CV keywords to match job descriptions in your field", impact: "High", effort: "Low" });
+    plan.thisQuarter.push({ action: "Pursue an advanced certification or specialisation in your domain", impact: "High", effort: "High" });
+  } else {
+    plan.thisSprint.push({ action: "Get your CV reviewed by peers in your target industry", impact: "Medium", effort: "Medium" });
+  }
+
+  if (scores.valueProp < 50) {
+    plan.thisWeek.push({ action: "Rewrite your CV summary to clearly state your unique value proposition", impact: "High", effort: "Low" });
+  }
+
+  if (scores.ctaPlacement < 40) {
+    plan.thisWeek.push({ action: "Add visible contact info, LinkedIn, and GitHub links to the top of your CV", impact: "High", effort: "Low" });
+  }
+
+  if (scores.overallScore < 35) {
+    plan.thisSprint.push({ action: "Restructure your CV with clear sections: Summary, Experience, Education, Skills", impact: "High", effort: "Medium" });
+  }
+
+  if (plan.thisSprint.length < 2) {
+    plan.thisSprint.push({ action: "Add case studies or detailed project descriptions to demonstrate depth", impact: "High", effort: "Medium" });
+  }
+  if (plan.thisQuarter.length < 2) {
+    plan.thisQuarter.push({ action: "Contribute to open source or build a showcase project in your field", impact: "High", effort: "High" });
+  }
+  if (plan.thisQuarter.length < 3) {
+    plan.thisQuarter.push({ action: "Attend industry events and build your professional network", impact: "Medium", effort: "High" });
+  }
+
+  return plan;
+}
+
 // ── Core call helper ───────────────────────────────────────────────────────
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function callCerebras(
   prompt: string,
-  opts: { jsonMode?: boolean; timeout?: number } = {}
+  opts: { jsonMode?: boolean; timeout?: number; temperature?: number } = {}
 ): Promise<string> {
-  const { jsonMode = true, timeout = 6000 } = opts;
+  const { jsonMode = true, timeout = 6000, temperature = 0.3 } = opts;
   const key = getApiKey();
   const MAX_RETRIES = 3;
 
@@ -149,7 +251,7 @@ async function callCerebras(
           messages: [
             { role: "user", content: prompt }
           ],
-          temperature: 0.8,
+          temperature,
           ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
         }),
         signal: AbortSignal.timeout(timeout),
@@ -240,21 +342,6 @@ function normalizeFuneral(d: any): FuneralResult {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function normalizePortfolio(d: any): PortfolioResult {
-  return {
-    overallScore:    Number(d?.overallScore)    || 0,
-    firstImpression: Number(d?.firstImpression) || 0,
-    caseStudyDepth:  Number(d?.caseStudyDepth)  || 0,
-    designTaste:     Number(d?.designTaste)     || 0,
-    skillProof:      Number(d?.skillProof)      || 0,
-    ctaScore:        Number(d?.ctaScore)        || 0,
-    summary:         String(d?.summary          || ""),
-    topIssues:       ns(d?.topIssues || []),
-    recruiterVerdict:String(d?.recruiterVerdict || ""),
-  };
-}
-
 function parseJSON<T>(text: string, fallback: T): T {
   try { return JSON.parse(text); } catch { /* try fence strip */ }
   try {
@@ -282,10 +369,7 @@ export async function runMegaBatch(ctx: RoastContext): Promise<{
   funeral?: FuneralResult;
   actionPlan: ActionPlanResult;
 }> {
-  const isPortfolio = ctx.mode === "portfolio";
-  const tone = ctx.roastLevel;
-
-  if (isPortfolio) {
+  if (ctx.mode === "portfolio") {
     return runPortfolioMegaBatch(ctx);
   }
 
@@ -294,16 +378,6 @@ export async function runMegaBatch(ctx: RoastContext): Promise<{
     { name: "Founder", emoji: "🚀", color: "#8B5CF6" },
     { name: "Investor", emoji: "💰", color: "#F97316" },
   ];
-
-  const investorTone = tone === "brutal" ? "the most RUTHLESS investors alive — destroy the pitch"
-    : tone === "hard" ? "aggressive investors who tear apart weak pitches"
-    : tone === "medium" ? "tough investors asking hard questions"
-    : "thoughtful investors giving fair feedback";
-
-  const funeralTone = tone === "brutal" ? "The product was murdered by its own incompetence. Be devastatingly savage."
-    : tone === "hard" ? "The product died a horrible death. Be brutally honest."
-    : tone === "medium" ? "The product failed. Write a direct autopsy."
-    : "The product has failed. Write a thoughtful post-mortem.";
 
   const prompt = `You are a world-class product auditor, UX researcher, startup investor, and strategist. ${getRoastTone(ctx.roastLevel)}
 
@@ -463,28 +537,81 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
   }
 }`;
 
-  const raw = await callCerebras(prompt, { jsonMode: true });
+  // ── Local scoring overrides AI for reliability ──
+  const text = ctx.scrapedText || ctx.description || "";
+  const cvScores = computeCVScores(text);
+  const computedActionPlan = generateCVActionPlan(cvScores);
+
+  const raw = await callCerebras(prompt, { jsonMode: true, temperature: 0.3, timeout: 10000 });
   const d = parseJSON<any>(raw, null);
 
   if (!d || !d.audit || !d.ux) {
     console.error("Cerebras failed to output valid JSON for portfolio. Raw response:", raw);
-    throw new Error(`AI generated invalid response structure. Raw: ${raw.slice(0, 150)}...`);
+    // Fall back to fully computed result
+    return {
+      audit: {
+        overallScore: cvScores.overallScore,
+        problemClarity: cvScores.problemClarity,
+        valueProp: cvScores.valueProp,
+        differentiation: cvScores.differentiation,
+        positioning: cvScores.positioning,
+        summary: "CV analysis based on content review.",
+        strengths: ["Analysis available"],
+        weaknesses: ["Full AI review unavailable"],
+      },
+      ux: {
+        score: cvScores.uxScore,
+        visualHierarchy: cvScores.visualHierarchy,
+        ctaPlacement: cvScores.ctaPlacement,
+        trustSignals: cvScores.trustSignals,
+        frictionPoints: [],
+        criticalIssues: [],
+        warnings: [],
+        quickWins: [],
+      },
+      personas: personaDefs.map(p => ({
+        persona: p.name, emoji: p.emoji, color: p.color,
+        firstImpression: "N/A", mainObjection: "N/A", verdict: "N/A", score: cvScores.overallScore,
+      })),
+      sharkTank: undefined,
+      funeral: undefined,
+      actionPlan: computedActionPlan,
+    };
   }
 
+  // Use AI text but override scores with computed ones (more reliable)
+  const audit = normalizeAudit(d?.audit || {});
+  const ux = normalizeUX(d?.ux || {});
+
+  audit.overallScore = cvScores.overallScore;
+  audit.problemClarity = cvScores.problemClarity;
+  audit.valueProp = cvScores.valueProp;
+  audit.differentiation = cvScores.differentiation;
+  audit.positioning = cvScores.positioning;
+  ux.score = cvScores.uxScore;
+  ux.visualHierarchy = cvScores.visualHierarchy;
+  ux.ctaPlacement = cvScores.ctaPlacement;
+  ux.trustSignals = cvScores.trustSignals;
+
+  const personas = Array.isArray(d?.personas) ? d.personas : personaDefs.map(p => ({
+    persona: p.name, emoji: p.emoji, color: p.color,
+    firstImpression: "N/A", mainObjection: "N/A", verdict: "N/A", score: cvScores.overallScore,
+  }));
+
+  // Override persona scores too
+  personas.forEach((p: PersonaResult, i: number) => {
+    if (i === 0) p.score = Math.min(92, cvScores.overallScore + 5);
+    else if (i === 1) p.score = cvScores.overallScore;
+    else p.score = Math.max(10, cvScores.overallScore - 5);
+  });
+
   return {
-    audit: normalizeAudit(d?.audit || {}),
-    ux: normalizeUX(d?.ux || {}),
-    personas: Array.isArray(d?.personas) ? d.personas : personaDefs.map(p => ({
-      persona: p.name, emoji: p.emoji, color: p.color,
-      firstImpression: "N/A", mainObjection: "N/A", verdict: "N/A", score: 50,
-    })),
+    audit,
+    ux,
+    personas,
     sharkTank: undefined,
     funeral: undefined,
-    actionPlan: d?.actionPlan ? {
-      thisWeek: Array.isArray(d.actionPlan.thisWeek) ? d.actionPlan.thisWeek : [],
-      thisSprint: Array.isArray(d.actionPlan.thisSprint) ? d.actionPlan.thisSprint : [],
-      thisQuarter: Array.isArray(d.actionPlan.thisQuarter) ? d.actionPlan.thisQuarter : [],
-    } : { thisWeek: [], thisSprint: [], thisQuarter: [] },
+    actionPlan: computedActionPlan,
   };
 }
 
@@ -511,24 +638,32 @@ Return ONLY the roast text. No JSON, no labels, no formatting.`;
 
 // ── CALL 3 (optional): Portfolio — only runs when mode=portfolio ───────────
 export async function portfolioRoast(ctx: RoastContext): Promise<PortfolioResult> {
+  const text = ctx.scrapedText || ctx.description || "";
+  const scores = computeCVScores(text);
+
   const prompt = `You are a Hiring Manager who has seen thousands of portfolios. ${getRoastTone(ctx.roastLevel)}
 ${buildContext(ctx, 2000)}
 
-CRITICAL SCORE RULE: All scores (overallScore, firstImpression, caseStudyDepth, designTaste, skillProof, ctaScore) MUST be integers rated on a 0 to 100 scale (e.g. 85, NOT 0 to 10).
+CRITICAL: Keep summary under 2 sentences. Keep topIssues items under 12 words each. Be punchy.
 
-SCORING RUBRIC — Grade each dimension independently based on actual portfolio content:
-- Exceptional proof of skills, clear impact metrics, polished design → 75-95
-- Competent but lacks differentiation or measurable results → 50-74
-- Generic, unpolished, missing context or weak presentation → 10-49
-- Incomplete, broken, or absent → 0-9
+Return ONLY this JSON (replace example scores with actual assessments):
+{"overallScore":${scores.overallScore},"firstImpression":${scores.uxScore},"caseStudyDepth":${scores.problemClarity},"designTaste":${scores.visualHierarchy},"skillProof":${scores.differentiation},"ctaScore":${scores.ctaPlacement},"summary":"","topIssues":[],"recruiterVerdict":""}`;
 
-Distribute scores across the full 0-100 range. Back each score with specific observations from the content.
+  const raw = await callCerebras(prompt, { jsonMode: true, temperature: 0.3, timeout: 10000 });
+  const ai = parseJSON<any>(raw, {});
 
-Return ONLY this JSON:
-{"overallScore":0,"firstImpression":0,"caseStudyDepth":0,"designTaste":0,"skillProof":0,"ctaScore":0,"summary":"","topIssues":[],"recruiterVerdict":""}`;
-
-  const raw = await callCerebras(prompt, { jsonMode: true });
-  return normalizePortfolio(parseJSON(raw, {}));
+  // Override scores with computed ones for reliability
+  return {
+    overallScore: scores.overallScore,
+    firstImpression: scores.uxScore,
+    caseStudyDepth: scores.problemClarity,
+    designTaste: scores.visualHierarchy,
+    skillProof: scores.differentiation,
+    ctaScore: scores.ctaPlacement,
+    summary: String(ai?.summary || ""),
+    topIssues: Array.isArray(ai?.topIssues) ? ai.topIssues : [],
+    recruiterVerdict: String(ai?.recruiterVerdict || ""),
+  };
 }
 
 // ── Backwards-compat exports ───────────────────────────────────────────────
