@@ -114,10 +114,11 @@ export interface FullRoastResult {
   audit: AuditResult;
   ux: UXResult;
   personas: PersonaResult[];
-  sharkTank: SharkTankResult;
-  funeral: FuneralResult;
+  sharkTank?: SharkTankResult;
+  funeral?: FuneralResult;
   actionPlan: ActionPlanResult;
   roastLevel: RoastLevel;
+  mode: "product" | "portfolio";
   aiRoast: string;
   portfolio?: PortfolioResult;
   scrapedText?: string;
@@ -277,16 +278,23 @@ export async function runMegaBatch(ctx: RoastContext): Promise<{
   audit: AuditResult;
   ux: UXResult;
   personas: PersonaResult[];
-  sharkTank: SharkTankResult;
-  funeral: FuneralResult;
+  sharkTank?: SharkTankResult;
+  funeral?: FuneralResult;
   actionPlan: ActionPlanResult;
 }> {
   const isPortfolio = ctx.mode === "portfolio";
-  const personaDefs = isPortfolio
-    ? [{ name: "Recruiter", emoji: "🔍", color: "#FF4500" }, { name: "Hiring Manager", emoji: "💼", color: "#8B5CF6" }, { name: "Fellow Designer", emoji: "🎨", color: "#F97316" }]
-    : [{ name: "First-Time Visitor", emoji: "👀", color: "#FF4500" }, { name: "Founder", emoji: "🚀", color: "#8B5CF6" }, { name: "Investor", emoji: "💰", color: "#F97316" }];
-
   const tone = ctx.roastLevel;
+
+  if (isPortfolio) {
+    return runPortfolioMegaBatch(ctx);
+  }
+
+  const personaDefs = [
+    { name: "First-Time Visitor", emoji: "👀", color: "#FF4500" },
+    { name: "Founder", emoji: "🚀", color: "#8B5CF6" },
+    { name: "Investor", emoji: "💰", color: "#F97316" },
+  ];
+
   const investorTone = tone === "brutal" ? "the most RUTHLESS investors alive — destroy the pitch"
     : tone === "hard" ? "aggressive investors who tear apart weak pitches"
     : tone === "medium" ? "tough investors asking hard questions"
@@ -299,18 +307,19 @@ export async function runMegaBatch(ctx: RoastContext): Promise<{
 
   const prompt = `You are a world-class product auditor, UX researcher, startup investor, and strategist. ${getRoastTone(ctx.roastLevel)}
 
-Analyse the following ${ctx.mode} across multiple dimensions simultaneously and return a SINGLE JSON object.
+Analyse the following product across multiple dimensions simultaneously and return a SINGLE JSON object.
 
 CRITICAL: Keep all summaries and text explanations under 2 sentences. Keep all list items under 12 words. Be punchy, direct, and concise to avoid response truncation.
 
-CRITICAL SCORE RULE: All scores (overallScore, problemClarity, valueProp, differentiation, positioning, score, visualHierarchy, ctaPlacement, trustSignals, personas[].score, moatScore, fundingReadiness, survivalChance) MUST be integers rated on a 0 to 100 scale (e.g. 78, 92, 45, NOT 0 to 10).
+CRITICAL SCORE RULE: All scores (overallScore, problemClarity, valueProp, differentiation, positioning, score, visualHierarchy, ctaPlacement, trustSignals, personas[].score, moatScore, fundingReadiness, survivalChance) MUST be integers rated on a 0 to 100 scale (e.g. 78, 92, 34, NOT 0 to 10).
 
-SCORE CALIBRATION RULES:
-- Be critical, but fair.
-- Excellent portfolios/products should score 75-95.
-- Average portfolios/products should score 50-74.
-- Poor portfolios/products should score 10-49.
-- Do NOT cluster all scores around a narrow range (like 35 or 45). Grade dynamically based on the actual content quality provided.
+SCORING RUBRIC — Grade each dimension independently based on actual content quality:
+- Unique differentiation, strong proof, clear value → 75-95
+- Solid fundamentals but generic or unclear → 50-74
+- Weak, vague, missing, or poorly executed → 10-49
+- Irrelevant, absent, or extremely poor → 0-9
+
+Distribute scores across the full 0-100 range. Identify specific content elements that justify each score. If content shows excellence in one area but flaws in another, reflect that variation in the scores.
 
 ${buildContext(ctx)}
 
@@ -375,6 +384,105 @@ Return ONLY this JSON structure (no markdown fences, no extra text):
   };
 }
 
+// ── Portfolio/CV Mega-Batch — separate prompt, no sharkTank/funeral ──────
+async function runPortfolioMegaBatch(ctx: RoastContext): Promise<{
+  audit: AuditResult;
+  ux: UXResult;
+  personas: PersonaResult[];
+  sharkTank?: undefined;
+  funeral?: undefined;
+  actionPlan: ActionPlanResult;
+}> {
+  const personaDefs = [
+    { name: "Recruiter", emoji: "🔍", color: "#FF4500" },
+    { name: "Hiring Manager", emoji: "💼", color: "#8B5CF6" },
+    { name: "Senior Engineer", emoji: "⚙️", color: "#F97316" },
+  ];
+
+  const tone = ctx.roastLevel;
+  const careerTone = tone === "brutal" ? "Be the most savage career coach alive. Destroy mediocre CVs without mercy."
+    : tone === "hard" ? "Be brutally honest about every CV flaw. No sugarcoating."
+    : tone === "medium" ? "Be direct and blunt about what's holding their career back."
+    : "Be honest but constructive. Help them land more interviews.";
+
+  const prompt = `You are a world-class Hiring Manager and Career Coach who has reviewed 10,000+ CVs. ${careerTone}
+
+Analyse this CV/portfolio across multiple dimensions and return a SINGLE JSON object.
+
+CRITICAL: Keep all summaries and text explanations under 2 sentences. Keep all list items under 12 words. Be punchy, direct, and concise to avoid response truncation.
+
+CRITICAL SCORE RULE: All scores (overallScore, problemClarity, valueProp, differentiation, positioning, score, visualHierarchy, ctaPlacement, trustSignals, personas[].score) MUST be integers rated on a 0 to 100 scale (e.g. 78, 92, 34, NOT 0 to 10).
+
+SCORING RUBRIC — Grade each dimension independently based on actual CV content quality:
+- Exceptional achievements with measurable impact, polished presentation → 75-95
+- Solid experience but generic descriptions, lacks metrics → 50-74
+- Vague, poorly formatted, missing key sections → 10-49
+- Incomplete, broken formatting, or absent → 0-9
+
+CV-SPECIFIC DIMENSIONS:
+- overallScore → Overall hireability and CV quality
+- problemClarity → How clearly are achievements and impact stated? Are results quantified?
+- valueProp → How well does the CV sell the candidate's unique value?
+- differentiation → What makes this candidate stand out from other applicants?
+- positioning → How well is the CV tailored to the target role/industry?
+
+UX DIMENSIONS (CV readability & design):
+- score → Overall CV layout, design quality, and scanability
+- visualHierarchy → Section ordering, spacing, typography, ATS-friendliness
+- ctaPlacement → Visibility of contact info, LinkedIn, GitHub, portfolio links
+- trustSignals → LinkedIn presence, credentials, certifications, endorsements
+
+Distribute scores across the full 0-100 range. Identify specific content elements that justify each score. If the CV shows excellence in one area but flaws in another, reflect that variation.
+
+${buildContext(ctx)}
+
+Return ONLY this JSON structure (no markdown fences, no extra text):
+{
+  "audit": {
+    "overallScore": 0, "problemClarity": 0, "valueProp": 0, "differentiation": 0, "positioning": 0,
+    "summary": "", "strengths": [], "weaknesses": []
+  },
+  "ux": {
+    "score": 0, "visualHierarchy": 0, "ctaPlacement": 0, "trustSignals": 0,
+    "frictionPoints": [], "criticalIssues": [], "warnings": [], "quickWins": []
+  },
+  "personas": [
+    {"persona":"${personaDefs[0].name}","emoji":"${personaDefs[0].emoji}","color":"${personaDefs[0].color}","firstImpression":"","mainObjection":"","verdict":"","score":0},
+    {"persona":"${personaDefs[1].name}","emoji":"${personaDefs[1].emoji}","color":"${personaDefs[1].color}","firstImpression":"","mainObjection":"","verdict":"","score":0},
+    {"persona":"${personaDefs[2].name}","emoji":"${personaDefs[2].emoji}","color":"${personaDefs[2].color}","firstImpression":"","mainObjection":"","verdict":"","score":0}
+  ],
+  "actionPlan": {
+    "thisWeek":    [{"action":"","impact":"High","effort":"Low"},{"action":"","impact":"High","effort":"Low"},{"action":"","impact":"High","effort":"Low"}],
+    "thisSprint":  [{"action":"","impact":"High","effort":"Medium"},{"action":"","impact":"High","effort":"Medium"},{"action":"","impact":"High","effort":"Medium"}],
+    "thisQuarter": [{"action":"","impact":"High","effort":"High"},{"action":"","impact":"High","effort":"High"},{"action":"","impact":"High","effort":"High"}]
+  }
+}`;
+
+  const raw = await callCerebras(prompt, { jsonMode: true });
+  const d = parseJSON<any>(raw, null);
+
+  if (!d || !d.audit || !d.ux) {
+    console.error("Cerebras failed to output valid JSON for portfolio. Raw response:", raw);
+    throw new Error(`AI generated invalid response structure. Raw: ${raw.slice(0, 150)}...`);
+  }
+
+  return {
+    audit: normalizeAudit(d?.audit || {}),
+    ux: normalizeUX(d?.ux || {}),
+    personas: Array.isArray(d?.personas) ? d.personas : personaDefs.map(p => ({
+      persona: p.name, emoji: p.emoji, color: p.color,
+      firstImpression: "N/A", mainObjection: "N/A", verdict: "N/A", score: 50,
+    })),
+    sharkTank: undefined,
+    funeral: undefined,
+    actionPlan: d?.actionPlan ? {
+      thisWeek: Array.isArray(d.actionPlan.thisWeek) ? d.actionPlan.thisWeek : [],
+      thisSprint: Array.isArray(d.actionPlan.thisSprint) ? d.actionPlan.thisSprint : [],
+      thisQuarter: Array.isArray(d.actionPlan.thisQuarter) ? d.actionPlan.thisQuarter : [],
+    } : { thisWeek: [], thisSprint: [], thisQuarter: [] },
+  };
+}
+
 // ── CALL 2: AI Roast narrative — 1 API call (plain text) ──────────────────
 export async function generateAiroast(ctx: RoastContext): Promise<string> {
   const toneMap = {
@@ -392,7 +500,8 @@ ${buildContext(ctx, 1200)}
 Return ONLY the roast text. No JSON, no labels, no formatting.`;
 
   const text = await callCerebras(prompt, { jsonMode: false, timeout: 9000 });
-  return text || "Could not generate roast. The product was so boring even the AI fell asleep.";
+  const noun = ctx.mode === "portfolio" ? "CV" : "product";
+  return text || `Could not generate roast. The ${noun} was so boring even the AI fell asleep.`;
 }
 
 // ── CALL 3 (optional): Portfolio — only runs when mode=portfolio ───────────
@@ -402,12 +511,13 @@ ${buildContext(ctx, 2000)}
 
 CRITICAL SCORE RULE: All scores (overallScore, firstImpression, caseStudyDepth, designTaste, skillProof, ctaScore) MUST be integers rated on a 0 to 100 scale (e.g. 85, NOT 0 to 10).
 
-SCORE CALIBRATION RULES:
-- Be critical, but fair.
-- Excellent portfolios should score 75-95.
-- Average portfolios should score 50-74.
-- Poor portfolios should score 10-49.
-- Do NOT cluster all scores around a narrow range (like 35 or 45). Grade dynamically based on the actual content quality provided.
+SCORING RUBRIC — Grade each dimension independently based on actual portfolio content:
+- Exceptional proof of skills, clear impact metrics, polished design → 75-95
+- Competent but lacks differentiation or measurable results → 50-74
+- Generic, unpolished, missing context or weak presentation → 10-49
+- Incomplete, broken, or absent → 0-9
+
+Distribute scores across the full 0-100 range. Back each score with specific observations from the content.
 
 Return ONLY this JSON:
 {"overallScore":0,"firstImpression":0,"caseStudyDepth":0,"designTaste":0,"skillProof":0,"ctaScore":0,"summary":"","topIssues":[],"recruiterVerdict":""}`;
@@ -427,10 +537,10 @@ export async function simulatePersonas(ctx: RoastContext): Promise<PersonaResult
   return (await runMegaBatch(ctx)).personas;
 }
 export async function sharkTankMode(ctx: RoastContext): Promise<SharkTankResult> {
-  return (await runMegaBatch(ctx)).sharkTank;
+  return (await runMegaBatch(ctx)).sharkTank ?? { questions: [], marketRisk: "", moatAnalysis: "", moatScore: 0, fundingVerdict: "", fundingReadiness: 0 };
 }
 export async function productFuneral(ctx: RoastContext): Promise<FuneralResult> {
-  return (await runMegaBatch(ctx)).funeral;
+  return (await runMegaBatch(ctx)).funeral ?? { causeOfDeath: "", timeOfDeath: "", missedSignals: [], epitaph: "", preventionPlan: [], survivalChance: 0 };
 }
 export async function buildActionPlan(_: Partial<FullRoastResult>): Promise<ActionPlanResult> {
   return { thisWeek: [], thisSprint: [], thisQuarter: [] };

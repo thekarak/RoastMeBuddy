@@ -167,6 +167,7 @@ export async function POST(req: NextRequest) {
       funeral,
       actionPlan,
       roastLevel,
+      mode,
       aiRoast: "", // Populated lazily on demand
       ...(portfolio ? { portfolio } : {}),
       scrapedText, // Cached to allow lazy generation

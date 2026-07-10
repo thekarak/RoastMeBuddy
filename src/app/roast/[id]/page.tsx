@@ -116,19 +116,35 @@ function RoastPanel({ text, loading }: { text: string; loading: boolean }) {
   );
 }
 
-function AuditPanel({ data }: { data: AuditResult }) {
+function AuditPanel({ data, mode }: { data: AuditResult; mode: "product" | "portfolio" }) {
+  const isPortfolio = mode === "portfolio";
+  const subLabels = isPortfolio
+    ? [
+        { label: "Achievement Clarity", color: "#FF4500" },
+        { label: "Unique Value", color: "#8B5CF6" },
+        { label: "Differentiation", color: "#F97316" },
+        { label: "Role Fit", color: "#22C55E" },
+      ]
+    : [
+        { label: "Problem Clarity", color: "#FF4500" },
+        { label: "Value Proposition", color: "#8B5CF6" },
+        { label: "Differentiation", color: "#F97316" },
+        { label: "Positioning", color: "#22C55E" },
+      ];
+
+  const scores = [data.problemClarity, data.valueProp, data.differentiation, data.positioning];
+
   return (
     <div className="space-y-6 fade-in-up">
       <div className="glass rounded-2xl p-6 border border-white/[0.06] flex flex-col md:flex-row gap-6 items-start">
         <ScoreRing score={data.overallScore} size={130} />
         <div className="flex-1 space-y-4">
-          <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-xl font-bold">Overall Audit</h3>
+          <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-xl font-bold">{isPortfolio ? "CV Audit" : "Overall Audit"}</h3>
           <p className="text-[#71717A] text-sm leading-relaxed" style={{ color: "#71717A" }}>{data.summary}</p>
           <div className="space-y-3">
-            <ScoreBar label="Problem Clarity" value={data.problemClarity} color="#FF4500" />
-            <ScoreBar label="Value Proposition" value={data.valueProp} color="#8B5CF6" />
-            <ScoreBar label="Differentiation" value={data.differentiation} color="#F97316" />
-            <ScoreBar label="Positioning" value={data.positioning} color="#22C55E" />
+            {subLabels.map((l, i) => (
+              <ScoreBar key={l.label} label={l.label} value={scores[i]} color={l.color} />
+            ))}
           </div>
         </div>
       </div>
@@ -378,14 +394,14 @@ function LoadingSkeleton() {
 }
 
 // ── TABS config ────────────────────────────────────────────────────────────
-const TABS = [
-  { id: "audit",     label: "🎯 Audit",       color: "#FF4500" },
-  { id: "roast",     label: "🎤 Roast",       color: "#EF4444" },
-  { id: "personas",  label: "🎭 Personas",    color: "#F97316" },
-  { id: "sharktank", label: "🦈 Shark Tank",  color: "#EF4444" },
-  { id: "funeral",   label: "⚰️ Funeral",     color: "#71717A" },
-  { id: "actions",   label: "✅ Action Plan", color: "#22C55E" },
-  { id: "portfolio", label: "💼 Portfolio",   color: "#06B6D4" },
+const ALL_TABS = [
+  { id: "audit",     label: "🎯 Audit",       color: "#FF4500", productOnly: false },
+  { id: "roast",     label: "🎤 Roast",       color: "#EF4444", productOnly: false },
+  { id: "personas",  label: "🎭 Personas",    color: "#F97316", productOnly: false },
+  { id: "sharktank", label: "🦈 Shark Tank",  color: "#EF4444", productOnly: true },
+  { id: "funeral",   label: "⚰️ Funeral",     color: "#71717A", productOnly: true },
+  { id: "actions",   label: "✅ Action Plan", color: "#22C55E", productOnly: false },
+  { id: "portfolio", label: "💼 Portfolio",   color: "#06B6D4", productOnly: false },
 ];
 
 // ── MAIN PAGE ──────────────────────────────────────────────────────────────
@@ -565,8 +581,9 @@ export default function RoastResultPage() {
     setDownloading(false);
   }
 
-  const visibleTabs = TABS.filter(t => {
-    if (t.id === "portfolio") return !!result?.portfolio;
+  const visibleTabs = ALL_TABS.filter(t => {
+    if (t.productOnly) return result?.mode === "product";
+    if (t.id === "portfolio") return result?.mode === "portfolio";
     return true;
   });
 
@@ -582,7 +599,7 @@ export default function RoastResultPage() {
         <div className="text-center pt-12 pb-6">
           <div className="text-5xl animate-bounce mb-4">🔥</div>
           <p style={{ fontFamily: "Syne, sans-serif" }} className="text-xl font-bold text-white mb-1">Roasting your product…</p>
-          <p className="text-[#71717A] font-mono text-sm">Running 6 AI engines in parallel</p>
+          <p className="text-[#71717A] font-mono text-sm">Analyzing with AI across multiple dimensions</p>
         </div>
         <LoadingSkeleton />
       </div>
@@ -658,11 +675,11 @@ export default function RoastResultPage() {
 
         {/* Panel content */}
         <div ref={captureRef} className="rounded-2xl">
-          {activeTab === "audit"     && <AuditPanel data={result.audit} />}
+          {activeTab === "audit"     && <AuditPanel data={result.audit} mode={result.mode} />}
           {activeTab === "roast"    && <RoastPanel text={aiRoastText} loading={loadingRoast} />}
           {activeTab === "personas"  && <PersonasPanel data={result.personas} />}
-          {activeTab === "sharktank" && <SharkTankPanel data={result.sharkTank} />}
-          {activeTab === "funeral"   && <FuneralPanel data={result.funeral} />}
+          {activeTab === "sharktank" && result.sharkTank && <SharkTankPanel data={result.sharkTank} />}
+          {activeTab === "funeral"   && result.funeral && <FuneralPanel data={result.funeral} />}
           {activeTab === "actions"   && <ActionPlanPanel data={result.actionPlan} />}
           {activeTab === "portfolio" && result.portfolio && <PortfolioPanel data={result.portfolio} />}
         </div>
