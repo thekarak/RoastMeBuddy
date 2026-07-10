@@ -122,7 +122,7 @@ export default function HomePage() {
   const [mode, setMode] = useState<"product" | "portfolio">("product");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [inputMode, setInputMode] = useState<"url" | "file">("url");
+  const [inputMode, setInputMode] = useState<"url" | "file">("file");
   const [roastLevel, setRoastLevel] = useState<RoastLevel>("medium");
   const [file, setFile] = useState<File | null>(null);
   const [cooldownMs, setCooldownMs] = useState(0);
@@ -242,7 +242,7 @@ export default function HomePage() {
             Before The Market Does.
           </h2>
           <p className="text-lg text-[#71717A] max-w-2xl mx-auto mb-12 leading-relaxed">
-            Drop in a URL or screenshot. Get back a structured, scored, brutally honest teardown —
+            Upload your CV or drop a URL. Get back a structured, scored, brutally honest teardown —
             from a PM, an investor, and a real user. In under 60 seconds.
           </p>
 
@@ -281,17 +281,21 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Input mode toggle: URL or File */}
-              <div className="flex justify-center mb-4">
-                <div className="flex glass rounded-full p-0.5 border border-white/10 gap-0.5">
-                  {(["url", "file"] as const).map((m) => (
+              {/* Input mode toggle: File first, then URL */}
+              <div className="flex justify-center mb-5">
+                <div className="flex glass rounded-full p-1 border border-white/10 gap-1">
+                  {(["file", "url"] as const).map((m) => (
                     <button
                       key={m}
                       type="button"
                       onClick={() => setInputMode(m)}
-                      className={`px-4 py-1.5 rounded-full text-xs font-mono transition-all ${inputMode === m ? "tab-active" : "text-[#71717A] hover:text-white"}`}
+                      className={`px-5 py-2 rounded-full text-sm font-mono transition-all ${
+                        inputMode === m
+                          ? "tab-active"
+                          : "text-[#71717A] hover:text-white"
+                      }`}
                     >
-                      {m === "url" ? "🔗 URL" : "📄 Upload CV"}
+                      {m === "file" ? "📄 Upload CV / Resume" : "🔗 Paste a URL"}
                     </button>
                   ))}
                 </div>
@@ -335,62 +339,93 @@ export default function HomePage() {
 
               {/* File upload */}
               {inputMode === "file" && (
-                <div className="relative">
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("border-[#FF4500]/60"); }}
-                    onDragLeave={(e) => { e.currentTarget.classList.remove("border-[#FF4500]/60"); }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.currentTarget.classList.remove("border-[#FF4500]/60");
-                      const f = e.dataTransfer.files[0];
-                      if (f && (f.name.endsWith(".pdf") || f.name.endsWith(".docx"))) {
-                        setFile(f);
-                        setError("");
-                      } else {
-                        setError("Please upload a PDF or DOCX file.");
-                      }
-                    }}
-                    className="glass border-2 border-dashed border-white/10 rounded-2xl p-8 text-center cursor-pointer transition-all hover:border-[#FF4500]/40 group"
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,.docx"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) { setFile(f); setError(""); }
+                <div className="relative space-y-4">
+                  {/* Glow border wrapper */}
+                  <div className="relative group">
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-[#FF4500] to-[#8B5CF6] rounded-2xl blur opacity-20 group-hover:opacity-50 transition-opacity duration-500 pointer-events-none" />
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.style.borderColor = "rgba(255,69,0,0.6)";
+                        e.currentTarget.style.background = "rgba(255,69,0,0.04)";
                       }}
-                    />
-                    {file ? (
-                      <div className="space-y-2">
-                        <span className="text-4xl block">📄</span>
-                        <p className="text-[#F1F1F3] font-mono text-sm">{file.name}</p>
-                        <p className="text-[#71717A] text-xs">{(file.size / 1024).toFixed(1)} KB</p>
-                        <p className="text-[#71717A] text-xs mt-2">Click or drag to replace</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <span className="text-4xl block group-hover:scale-110 transition-transform">📄</span>
-                        <p className="text-[#F1F1F3] font-semibold">Drop your CV here</p>
-                        <p className="text-[#71717A] text-sm font-mono">PDF or DOCX supported</p>
-                      </div>
-                    )}
+                      onDragLeave={(e) => {
+                        e.currentTarget.style.borderColor = "";
+                        e.currentTarget.style.background = "";
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.style.borderColor = "";
+                        e.currentTarget.style.background = "";
+                        const f = e.dataTransfer.files[0];
+                        if (f && (f.name.endsWith(".pdf") || f.name.endsWith(".docx"))) {
+                          setFile(f);
+                          setError("");
+                        } else {
+                          setError("Please upload a PDF or DOCX file.");
+                        }
+                      }}
+                      className="relative glass border-2 border-dashed border-white/15 rounded-2xl p-10 text-center cursor-pointer transition-all duration-300"
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf,.docx"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) { setFile(f); setError(""); }
+                        }}
+                      />
+                      {file ? (
+                        <div className="space-y-3">
+                          <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center" style={{ background: "rgba(255,69,0,0.12)", border: "1px solid rgba(255,69,0,0.3)" }}>
+                            <span className="text-3xl">📄</span>
+                          </div>
+                          <div>
+                            <p className="text-[#F1F1F3] font-mono text-sm font-semibold">{file.name}</p>
+                            <p className="text-[#71717A] text-xs mt-1">{(file.size / 1024).toFixed(1)} KB · Ready to roast</p>
+                          </div>
+                          <p className="text-[#71717A] text-xs border border-white/10 inline-block px-3 py-1 rounded-full">Click or drag to replace</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style={{ background: "rgba(255,69,0,0.08)", border: "1px solid rgba(255,69,0,0.2)" }}>
+                            <span className="text-4xl">📄</span>
+                          </div>
+                          <div>
+                            <p style={{ fontFamily: "Syne, sans-serif" }} className="text-[#F1F1F3] text-xl font-bold">Drop your CV or Resume here</p>
+                            <p className="text-[#71717A] text-sm font-mono mt-1">PDF or DOCX · Max 10 MB</p>
+                          </div>
+                          <div className="flex items-center justify-center gap-4 text-xs text-[#71717A]">
+                            <span className="flex items-center gap-1"><span>✓</span> Instant analysis</span>
+                            <span className="w-1 h-1 rounded-full bg-white/20" />
+                            <span className="flex items-center gap-1"><span>✓</span> No data stored</span>
+                            <span className="w-1 h-1 rounded-full bg-white/20" />
+                            <span className="flex items-center gap-1"><span>✓</span> Free forever</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
+
                   {/* File upload submit button */}
                   <button
                     type="submit"
                     disabled={loading || !file || cooldownMs > 0}
-                    className="btn-primary mt-4 w-full px-7 py-3 rounded-full flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="btn-primary w-full px-7 py-3.5 rounded-full flex items-center justify-center gap-2 text-base font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {loading ? (
-                      <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Roasting…</>
-                    ) : "Roast My CV →"}
+                      <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Roasting your CV…</>
+                    ) : (
+                      <>{!file ? "Select a file first" : "🔥 Roast My CV →"}</>
+                    )}
                   </button>
+
                   {/* Cooldown timer for file mode */}
                   {cooldownMs > 0 && !loading && (
-                    <div className="mt-3 flex justify-center fade-in-up">
+                    <div className="flex justify-center fade-in-up">
                       <CooldownRing remainingMs={cooldownMs} totalMs={COOLDOWN_MS} />
                     </div>
                   )}

@@ -129,9 +129,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function callCerebras(
   prompt: string,
-  opts: { jsonMode?: boolean } = {}
+  opts: { jsonMode?: boolean; timeout?: number } = {}
 ): Promise<string> {
-  const { jsonMode = true } = opts;
+  const { jsonMode = true, timeout = 6000 } = opts;
   const key = getApiKey();
   const MAX_RETRIES = 3;
 
@@ -151,7 +151,7 @@ async function callCerebras(
           temperature: 0.8,
           ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
         }),
-        signal: AbortSignal.timeout(6000), // 6 seconds timeout to prevent hanging Vercel
+        signal: AbortSignal.timeout(timeout),
       });
 
       if ((res.status === 401 || res.status === 403) || res.status === 400) {
@@ -305,6 +305,13 @@ CRITICAL: Keep all summaries and text explanations under 2 sentences. Keep all l
 
 CRITICAL SCORE RULE: All scores (overallScore, problemClarity, valueProp, differentiation, positioning, score, visualHierarchy, ctaPlacement, trustSignals, personas[].score, moatScore, fundingReadiness, survivalChance) MUST be integers rated on a 0 to 100 scale (e.g. 78, 92, 45, NOT 0 to 10).
 
+SCORE CALIBRATION RULES:
+- Be critical, but fair.
+- Excellent portfolios/products should score 75-95.
+- Average portfolios/products should score 50-74.
+- Poor portfolios/products should score 10-49.
+- Do NOT cluster all scores around a narrow range (like 35 or 45). Grade dynamically based on the actual content quality provided.
+
 ${buildContext(ctx)}
 
 Return ONLY this JSON structure (no markdown fences, no extra text):
@@ -384,7 +391,7 @@ ${buildContext(ctx, 1200)}
 
 Return ONLY the roast text. No JSON, no labels, no formatting.`;
 
-  const text = await callCerebras(prompt, { jsonMode: false });
+  const text = await callCerebras(prompt, { jsonMode: false, timeout: 9000 });
   return text || "Could not generate roast. The product was so boring even the AI fell asleep.";
 }
 
@@ -394,6 +401,13 @@ export async function portfolioRoast(ctx: RoastContext): Promise<PortfolioResult
 ${buildContext(ctx, 2000)}
 
 CRITICAL SCORE RULE: All scores (overallScore, firstImpression, caseStudyDepth, designTaste, skillProof, ctaScore) MUST be integers rated on a 0 to 100 scale (e.g. 85, NOT 0 to 10).
+
+SCORE CALIBRATION RULES:
+- Be critical, but fair.
+- Excellent portfolios should score 75-95.
+- Average portfolios should score 50-74.
+- Poor portfolios should score 10-49.
+- Do NOT cluster all scores around a narrow range (like 35 or 45). Grade dynamically based on the actual content quality provided.
 
 Return ONLY this JSON:
 {"overallScore":0,"firstImpression":0,"caseStudyDepth":0,"designTaste":0,"skillProof":0,"ctaScore":0,"summary":"","topIssues":[],"recruiterVerdict":""}`;
