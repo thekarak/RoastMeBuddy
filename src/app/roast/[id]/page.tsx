@@ -628,14 +628,16 @@ export default function RoastResultPage() {
             <button onClick={copyLink} className="btn-primary px-4 py-1.5 rounded-full text-sm flex items-center gap-2">
               {copied ? "✅ Copied!" : "🔗 Share"}
             </button>
-            <button onClick={downloadImage} disabled={downloading} className="px-4 py-1.5 rounded-full text-sm flex items-center gap-2 border border-white/10 hover:bg-white/5 transition-all disabled:opacity-50">
-              {downloading ? (
-                <>
-                  <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Exporting…
-                </>
-              ) : "📷 Download"}
-            </button>
+            {activeTab === "roast" && (
+              <button onClick={downloadImage} disabled={downloading} className="px-4 py-1.5 rounded-full text-sm flex items-center gap-2 border border-white/10 hover:bg-white/5 transition-all disabled:opacity-50">
+                {downloading ? (
+                  <>
+                    <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Exporting…
+                  </>
+                ) : "📷 Download"}
+              </button>
+            )}
           </div>
         </div>
       </header>
