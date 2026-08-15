@@ -1,15 +1,13 @@
-// lib/cerebras.ts — Cerebras AI API
-const MODEL = "gpt-oss-120b";
-const CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1/chat/completions";
+// lib/cerebras.ts — OpenCode Zen API (DeepSeek V4 Flash free)
+const MODEL = "deepseek-v4-flash-free";
+const ZEN_BASE_URL = "https://opencode.ai/zen/v1/chat/completions";
 
 function getApiKey(): string {
-  const key = 
-    process.env.CEREBRAS_API_KEY || 
-    process.env.CEREBERAS_API_KEY || 
-    process.env.CEREBRAS_KEY || 
-    process.env.CEREBERAS_KEY;
-    
-  if (!key) throw new Error("CEREBRAS_API_KEY is not set in environment variables");
+  const key =
+    process.env.OPENCODE_ZEN_API_KEY ||
+    process.env.ZEN_API_KEY;
+
+  if (!key) throw new Error("OPENCODE_ZEN_API_KEY is not set in environment variables");
   return key;
 }
 
@@ -240,7 +238,7 @@ async function callCerebras(
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const res = await fetch(CEREBRAS_BASE_URL, {
+      const res = await fetch(ZEN_BASE_URL, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${key}`,
@@ -257,21 +255,21 @@ async function callCerebras(
         signal: AbortSignal.timeout(timeout),
       });
 
-      if ((res.status === 401 || res.status === 403) || res.status === 400) {
+      if (res.status === 401 || res.status === 403 || res.status === 400) {
         const errText = await res.text().catch(() => "Unauthorized/Invalid Request");
-        throw new Error(`Cerebras Authentication/Request Error (${res.status}): ${errText}`);
+        throw new Error(`OpenCode Zen Authentication/Request Error (${res.status}): ${errText}`);
       }
 
       if (res.status === 429 && attempt < MAX_RETRIES) {
         const waitMs = Math.min(2000 * Math.pow(2, attempt), 10000);
-        console.warn(`Cerebras rate limit hit — waiting ${waitMs}ms before retry ${attempt + 1}/${MAX_RETRIES}`);
+        console.warn(`OpenCode Zen rate limit hit — waiting ${waitMs}ms before retry ${attempt + 1}/${MAX_RETRIES}`);
         await sleep(waitMs);
         continue;
       }
 
       if (!res.ok) {
         const errText = await res.text().catch(() => "Unknown error");
-        throw new Error(`Cerebras API error ${res.status}: ${errText}`);
+        throw new Error(`OpenCode Zen API error ${res.status}: ${errText}`);
       }
 
       const data = await res.json();
@@ -280,15 +278,15 @@ async function callCerebras(
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       const isAuthError = msg.includes("Authentication/Request Error") || msg.includes("401") || msg.includes("403");
-      
+
       if (isAuthError || attempt >= MAX_RETRIES) {
         throw err;
       }
-      console.warn(`Cerebras request attempt ${attempt + 1} failed: ${msg}. Retrying in 1.5s...`);
+      console.warn(`OpenCode Zen request attempt ${attempt + 1} failed: ${msg}. Retrying in 1.5s...`);
       await sleep(1500);
     }
   }
-  throw new Error("Cerebras API: failed after retries");
+  throw new Error("OpenCode Zen API: failed after retries");
 }
 
 // ── Normalizers ────────────────────────────────────────────────────────────
