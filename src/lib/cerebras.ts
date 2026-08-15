@@ -430,7 +430,7 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
   const d = parseJSON<any>(raw, null);
 
   if (!d || !d.audit || !d.ux) {
-    console.error("Cerebras failed to output valid JSON. Raw response:", raw);
+    console.error("OpenCode Zen failed to output valid JSON. Raw response:", raw);
     throw new Error(`AI generated invalid response structure. Raw: ${raw.slice(0, 150)}...`);
   }
 
@@ -546,7 +546,7 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
   const d = parseJSON<any>(raw, null);
 
   if (!d || !d.audit || !d.ux) {
-    console.error("Cerebras failed to output valid JSON for portfolio. Raw response:", raw);
+    console.error("OpenCode Zen failed to output valid JSON for portfolio. Raw response:", raw);
     // Fall back to fully computed result
     return {
       audit: {

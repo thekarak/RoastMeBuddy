@@ -186,19 +186,22 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Roast API error:", err);
     const msg = err instanceof Error ? err.message : "Unknown error";
-    if (msg.includes("CEREBRAS_API_KEY is not set")) {
+    if (msg.includes("OPENCODE_ZEN_API_KEY is not set")) {
       const availableKeys = Object.keys(process.env)
-        .filter(k => k.toUpperCase().includes("KEY") || k.toUpperCase().includes("CEREB") || k.toUpperCase().includes("GEMINI") || k.toUpperCase().includes("DATABASE"))
+        .filter(k => k.toUpperCase().includes("KEY") || k.toUpperCase().includes("ZEN") || k.toUpperCase().includes("OPENCODE") || k.toUpperCase().includes("DATABASE"))
         .join(", ");
-      return NextResponse.json({ 
-        error: `Server Configuration Error: CEREBRAS_API_KEY is not defined. Available env vars on Vercel: [${availableKeys || "None"}]` 
+      return NextResponse.json({
+        error: `Server Configuration Error: OPENCODE_ZEN_API_KEY is not defined. Available env vars: [${availableKeys || "None"}]`
       }, { status: 500 });
     }
-    if (msg.includes("401") || msg.includes("Unauthorized") || msg.includes("API_KEY_INVALID") || msg.includes("api_key")) {
-      return NextResponse.json({ error: "Authentication Error: The Cerebras API key was rejected as invalid. Check your key at cloud.cerebras.ai." }, { status: 500 });
+    if (msg.includes("401") || msg.includes("Unauthorized") || msg.includes("Authentication/Request Error") || msg.includes("api_key")) {
+      return NextResponse.json({ error: "Authentication Error: The OpenCode Zen API key was rejected. Check your key at opencode.ai/zen." }, { status: 500 });
     }
     if (msg.includes("rate limit") || msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
-      return NextResponse.json({ error: "Cerebras rate limit hit. Please wait a few seconds and try again." }, { status: 429 });
+      return NextResponse.json({ error: "Rate limit hit. Please wait a few seconds and try again." }, { status: 429 });
+    }
+    if (msg.includes("aborted") || msg.includes("timeout") || msg.includes("TimeoutError")) {
+      return NextResponse.json({ error: "The AI took too long to respond. Please try again." }, { status: 504 });
     }
     if (msg.includes("worker") || msg.includes("pdf")) {
       return NextResponse.json({ error: "Failed to parse PDF file. Try a different file." }, { status: 400 });
