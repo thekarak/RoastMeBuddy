@@ -232,7 +232,7 @@ async function callCerebras(
   prompt: string,
   opts: { jsonMode?: boolean; timeout?: number; temperature?: number } = {}
 ): Promise<string> {
-  const { jsonMode = true, timeout = 6000, temperature = 0.3 } = opts;
+  const { jsonMode = true, timeout = 45000, temperature = 0.3 } = opts;
   const key = getApiKey();
   const MAX_RETRIES = 3;
 
@@ -278,8 +278,10 @@ async function callCerebras(
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       const isAuthError = msg.includes("Authentication/Request Error") || msg.includes("401") || msg.includes("403");
+      // Don't retry on timeout — it'll just make things worse
+      const isTimeout = err instanceof Error && (err.name === "TimeoutError" || msg.includes("aborted") || msg.includes("timeout"));
 
-      if (isAuthError || attempt >= MAX_RETRIES) {
+      if (isAuthError || isTimeout || attempt >= MAX_RETRIES) {
         throw err;
       }
       console.warn(`OpenCode Zen request attempt ${attempt + 1} failed: ${msg}. Retrying in 1.5s...`);
@@ -424,7 +426,7 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
   }
 }`;
 
-  const raw = await callCerebras(prompt, { jsonMode: true });
+  const raw = await callCerebras(prompt, { jsonMode: true, timeout: 45000 });
   const d = parseJSON<any>(raw, null);
 
   if (!d || !d.audit || !d.ux) {
@@ -540,7 +542,7 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
   const cvScores = computeCVScores(text);
   const computedActionPlan = generateCVActionPlan(cvScores);
 
-  const raw = await callCerebras(prompt, { jsonMode: true, temperature: 0.3, timeout: 10000 });
+  const raw = await callCerebras(prompt, { jsonMode: true, temperature: 0.3, timeout: 45000 });
   const d = parseJSON<any>(raw, null);
 
   if (!d || !d.audit || !d.ux) {
@@ -629,7 +631,7 @@ ${buildContext(ctx, 1200)}
 
 Return ONLY the roast text. No JSON, no labels, no formatting.`;
 
-  const text = await callCerebras(prompt, { jsonMode: false, timeout: 9000 });
+  const text = await callCerebras(prompt, { jsonMode: false, timeout: 45000 });
   const noun = ctx.mode === "portfolio" ? "CV" : "product";
   return text || `Could not generate roast. The ${noun} was so boring even the AI fell asleep.`;
 }
@@ -647,7 +649,7 @@ CRITICAL: Keep summary under 2 sentences. Keep topIssues items under 12 words ea
 Return ONLY this JSON (replace example scores with actual assessments):
 {"overallScore":${scores.overallScore},"firstImpression":${scores.uxScore},"caseStudyDepth":${scores.problemClarity},"designTaste":${scores.visualHierarchy},"skillProof":${scores.differentiation},"ctaScore":${scores.ctaPlacement},"summary":"","topIssues":[],"recruiterVerdict":""}`;
 
-  const raw = await callCerebras(prompt, { jsonMode: true, temperature: 0.3, timeout: 10000 });
+  const raw = await callCerebras(prompt, { jsonMode: true, temperature: 0.3, timeout: 45000 });
   const ai = parseJSON<any>(raw, {});
 
   // Override scores with computed ones for reliability
