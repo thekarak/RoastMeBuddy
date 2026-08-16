@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
-      mode = (formData.get("mode") as "product" | "portfolio") || "product";
+      mode = (formData.get("mode") as "product" | "portfolio") || "portfolio";
       roastLevel = (formData.get("roastLevel") as RoastLevel) || "medium";
       const file = formData.get("file") as File | null;
       if (!file) {

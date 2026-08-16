@@ -153,12 +153,13 @@ export default function HomePage() {
 
     setLoading(true);
     setError("");
+    const effectiveMode = inputMode === "file" ? "portfolio" : mode;
     try {
       let res: Response;
       if (inputMode === "file" && file) {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("mode", mode);
+        formData.append("mode", effectiveMode);
         formData.append("roastLevel", roastLevel);
         res = await fetch("/api/roast", {
           method: "POST",
@@ -168,7 +169,7 @@ export default function HomePage() {
         res = await fetch("/api/roast", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url, mode, roastLevel }),
+          body: JSON.stringify({ url, mode: effectiveMode, roastLevel }),
         });
       }
       let data;
@@ -295,7 +296,11 @@ export default function HomePage() {
                     <button
                       key={m}
                       type="button"
-                      onClick={() => setInputMode(m)}
+                      onClick={() => {
+                        setInputMode(m);
+                        if (m === "file") setMode("portfolio");
+                        else setMode("product");
+                      }}
                       className={`px-5 py-2 rounded-full text-sm font-mono transition-all ${
                         inputMode === m
                           ? "tab-active"
