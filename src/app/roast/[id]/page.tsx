@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import html2canvas from "html2canvas";
-import type { FullRoastResult, AuditResult, PersonaResult, SharkTankResult, FuneralResult, ActionPlanResult, PortfolioResult } from "@/lib/cerebras";
+import type { FullRoastResult, AuditResult, UXResult, PersonaResult, SharkTankResult, FuneralResult, ActionPlanResult, PortfolioResult } from "@/lib/cerebras";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function ScoreBar({ label, value, color = "#FF4500" }: { label: string; value: number; color?: string }) {
@@ -75,7 +75,7 @@ function IssueRow({ text, type }: { text: string; type: "critical" | "warning" |
 }
 
 // ── Tab panels ─────────────────────────────────────────────────────────────
-function RoastPanel({ text, loading }: { text: string; loading: boolean }) {
+function RoastPanel({ text, loading, onRetry }: { text: string; loading: boolean; onRetry?: () => void }) {
   return (
     <div className="space-y-6 fade-in-up">
       <div className="glass rounded-2xl p-8 border border-white/[0.06] relative overflow-hidden">
@@ -101,6 +101,15 @@ function RoastPanel({ text, loading }: { text: string; loading: boolean }) {
               <div className="h-4 bg-white/5 rounded w-full animate-pulse" />
               <div className="h-4 bg-white/5 rounded w-3/4 animate-pulse" />
             </div>
+          ) : text.includes("unavailable") ? (
+            <div className="text-center space-y-4">
+              <p className="text-[#71717A] font-mono text-sm">{text}</p>
+              {onRetry && (
+                <button onClick={onRetry} className="btn-primary px-5 py-2 rounded-full text-sm">
+                  🔄 Retry Roast
+                </button>
+              )}
+            </div>
           ) : (
             <div className="prose prose-invert max-w-none">
               {(text || "The product is so boring even the AI fell asleep.").split("\n").filter(Boolean).map((paragraph, i, arr) => (
@@ -112,6 +121,91 @@ function RoastPanel({ text, loading }: { text: string; loading: boolean }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function EmptySection({ message }: { message: string }) {
+  return (
+    <div className="glass rounded-xl p-6 border border-white/[0.06] text-center">
+      <p className="text-sm text-[#71717A] font-mono">{message}</p>
+    </div>
+  );
+}
+
+function UXPanel({ data, mode }: { data: UXResult; mode: "product" | "portfolio" }) {
+  const isPortfolio = mode === "portfolio";
+  const subLabels = isPortfolio
+    ? [
+        { label: "Section Layout & ATS", color: "#FF4500" },
+        { label: "Contact Links Visibility", color: "#8B5CF6" },
+        { label: "Credentials & Links", color: "#F97316" },
+      ]
+    : [
+        { label: "Visual Hierarchy", color: "#FF4500" },
+        { label: "CTA Placement", color: "#8B5CF6" },
+        { label: "Trust Signals", color: "#F97316" },
+      ];
+  const scores = [data.visualHierarchy, data.ctaPlacement, data.trustSignals];
+
+  return (
+    <div className="space-y-6 fade-in-up">
+      <div className="glass rounded-2xl p-6 border border-white/[0.06] flex flex-col md:flex-row gap-6 items-start">
+        <ScoreRing score={data.score} size={130} color="#8B5CF6" />
+        <div className="flex-1 space-y-4">
+          <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-xl font-bold">
+            {isPortfolio ? "CV Readability Audit" : "UX + Conversion Audit"}
+          </h3>
+          <p className="text-[#71717A] text-sm leading-relaxed">
+            {isPortfolio
+              ? "How scannable, ATS-friendly, and recruiter-ready your CV layout is."
+              : "How users experience your page — hierarchy, CTAs, and trust."}
+          </p>
+          <div className="space-y-3">
+            {subLabels.map((l, i) => (
+              <ScoreBar key={l.label} label={l.label} value={scores[i]} color={l.color} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {data.criticalIssues.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider">🔴 Critical Issues</h4>
+          {data.criticalIssues.map((issue, i) => <IssueRow key={i} text={issue} type="critical" />)}
+        </div>
+      )}
+
+      {data.warnings.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-mono text-yellow-400 uppercase tracking-wider">🟡 Warnings</h4>
+          {data.warnings.map((w, i) => <IssueRow key={i} text={w} type="warning" />)}
+        </div>
+      )}
+
+      {data.frictionPoints.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-mono text-[#71717A] uppercase tracking-wider">⚡ Friction Points</h4>
+          {data.frictionPoints.map((f, i) => (
+            <div key={i} className="flex gap-3 items-start glass rounded-xl p-4 border border-white/[0.06]">
+              <span className="text-[#F97316] flex-shrink-0">→</span>
+              <p className="text-sm text-[#F1F1F3]">{f}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.quickWins.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-mono text-green-400 uppercase tracking-wider">🟢 Quick Wins</h4>
+          {data.quickWins.map((q, i) => <IssueRow key={i} text={q} type="good" />)}
+        </div>
+      )}
+
+      {data.criticalIssues.length === 0 && data.warnings.length === 0 &&
+       data.frictionPoints.length === 0 && data.quickWins.length === 0 && (
+        <EmptySection message="No specific UX issues flagged — scores above tell the story." />
+      )}
     </div>
   );
 }
@@ -303,7 +397,7 @@ function ActionPlanPanel({ data }: { data: ActionPlanResult }) {
               <span>{col.icon}</span>{col.label}
             </h4>
             <div className="space-y-3">
-              {data[col.key].map((item, i) => (
+              {(data[col.key].length > 0 ? data[col.key] : [{ action: "No actions generated for this timeframe.", impact: "—", effort: "—" }]).map((item, i) => (
                 <div key={i} className="glass rounded-xl p-3.5 border border-white/[0.04]">
                   <p className="text-sm text-[#F1F1F3] mb-2 leading-relaxed" style={{ color: "#F1F1F3" }}>{item.action}</p>
                   <div className="flex gap-2">
@@ -396,6 +490,7 @@ function LoadingSkeleton() {
 // ── TABS config ────────────────────────────────────────────────────────────
 const ALL_TABS = [
   { id: "audit",     label: "🎯 Audit",       color: "#FF4500", productOnly: false },
+  { id: "ux",        label: "👁️ UX",          color: "#8B5CF6", productOnly: false },
   { id: "roast",     label: "🎤 Roast",       color: "#EF4444", productOnly: false },
   { id: "personas",  label: "🎭 Personas",    color: "#F97316", productOnly: false },
   { id: "sharktank", label: "🦈 Shark Tank",  color: "#EF4444", productOnly: true },
@@ -417,63 +512,75 @@ export default function RoastResultPage() {
   const [loadingRoast, setLoadingRoast] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
 
+  const fetchNarrative = useCallback(() => {
+    if (!id) return;
+    setLoadingRoast(true);
+    setAiRoastText("");
+    fetch(`/api/roast?id=${id}&type=narrative`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Narrative fetch failed");
+        return res.json();
+      })
+      .then((data) => {
+        if (data.aiRoast) {
+          setAiRoastText(data.aiRoast);
+          setResult((prev) => {
+            if (!prev) return prev;
+            const updated = { ...prev, aiRoast: data.aiRoast };
+            sessionStorage.setItem(`roast_${id}`, JSON.stringify(updated));
+            return updated;
+          });
+        } else {
+          setAiRoastText("The comedy roast narrative is unavailable for this shared link.");
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load AI roast narrative:", err);
+        setAiRoastText("The comedy roast narrative is unavailable for this shared link.");
+      })
+      .finally(() => setLoadingRoast(false));
+  }, [id]);
+
   // Sync state with loaded result
   useEffect(() => {
-    if (result) {
-      setAiRoastText(result.aiRoast || "");
+    if (result?.aiRoast) {
+      setAiRoastText(result.aiRoast);
     }
   }, [result]);
 
-  // Lazy generation effect when "roast" tab is selected
+  // Lazy generation when "roast" tab is selected
   useEffect(() => {
     if (activeTab === "roast" && !aiRoastText && !loadingRoast && id) {
-      setLoadingRoast(true);
-      fetch(`/api/roast?id=${id}&type=narrative`)
-        .then((res) => {
-          if (!res.ok) throw new Error("Narrative fetch failed");
-          return res.json();
-        })
-        .then((data) => {
-          if (data.aiRoast) {
-            setAiRoastText(data.aiRoast);
-            if (result) {
-              const updated = { ...result, aiRoast: data.aiRoast };
-              setResult(updated);
-              sessionStorage.setItem(`roast_${id}`, JSON.stringify(updated));
-            }
-          } else {
-            setAiRoastText("The comedy roast narrative is unavailable for this shared link.");
-          }
-        })
-        .catch((err) => {
-          console.error("Failed to load AI roast narrative:", err);
-          setAiRoastText("The comedy roast narrative is unavailable for this shared link.");
-        })
-        .finally(() => setLoadingRoast(false));
+      fetchNarrative();
     }
-  }, [activeTab, aiRoastText, loadingRoast, id, result]);
+  }, [activeTab, aiRoastText, loadingRoast, id, fetchNarrative]);
 
   useEffect(() => {
     async function load() {
-      // 1. Check URL hash first (shared links)
+      // 1. sessionStorage — full result from same browser session (includes scrapedText)
+      const cached = sessionStorage.getItem(`roast_${id}`);
+      if (cached) {
+        try {
+          setResult(JSON.parse(cached));
+          setLoading(false);
+          return;
+        } catch { /* fall through */ }
+      }
+
+      // 2. URL hash — shared links (may omit scrapedText)
       if (typeof window !== "undefined" && window.location.hash) {
         try {
           const hash = window.location.hash.slice(1);
           const decoded = JSON.parse(decodeURIComponent(escape(atob(hash))));
           setResult(decoded);
+          sessionStorage.setItem(`roast_${id}`, JSON.stringify(decoded));
           setLoading(false);
           return;
         } catch {
           // hash decode failed, fall through
         }
       }
-      // 2. Check sessionStorage (set by landing page after roast)
-      const cached = sessionStorage.getItem(`roast_${id}`);
-      if (cached) {
-        setResult(JSON.parse(cached));
-        setLoading(false);
-        return;
-      }
+
       // 3. Fallback: fetch from API
       try {
         const res = await fetch(`/api/roast?id=${id}`);
@@ -481,6 +588,7 @@ export default function RoastResultPage() {
           const text = await res.text();
           const data = JSON.parse(text);
           setResult(data.result);
+          sessionStorage.setItem(`roast_${id}`, JSON.stringify(data.result));
         }
       } catch (e) {
         console.error("Failed to fetch roast data from API:", e);
@@ -598,7 +706,9 @@ export default function RoastResultPage() {
         </header>
         <div className="text-center pt-12 pb-6">
           <div className="text-5xl animate-bounce mb-4">🔥</div>
-          <p style={{ fontFamily: "Syne, sans-serif" }} className="text-xl font-bold text-white mb-1">Roasting your product…</p>
+          <p style={{ fontFamily: "Syne, sans-serif" }} className="text-xl font-bold text-white mb-1">
+            {result?.mode === "portfolio" ? "Roasting your CV…" : "Roasting your product…"}
+          </p>
           <p className="text-[#71717A] font-mono text-sm">Analyzing with AI across multiple dimensions</p>
         </div>
         <LoadingSkeleton />
@@ -668,7 +778,7 @@ export default function RoastResultPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-mono transition-all whitespace-nowrap ${activeTab === tab.id ? "tab-active" : "text-[#71717A] hover:text-white hover:bg-white/5"}`}
             >
-              {tab.label}
+              {tab.id === "ux" && result.mode === "portfolio" ? "📄 CV Layout" : tab.label}
             </button>
           ))}
         </div>
@@ -676,7 +786,8 @@ export default function RoastResultPage() {
         {/* Panel content */}
         <div ref={captureRef} className="rounded-2xl">
           {activeTab === "audit"     && <AuditPanel data={result.audit} mode={result.mode} />}
-          {activeTab === "roast"    && <RoastPanel text={aiRoastText} loading={loadingRoast} />}
+          {activeTab === "ux"        && <UXPanel data={result.ux} mode={result.mode} />}
+          {activeTab === "roast"    && <RoastPanel text={aiRoastText} loading={loadingRoast} onRetry={fetchNarrative} />}
           {activeTab === "personas"  && <PersonasPanel data={result.personas} />}
           {activeTab === "sharktank" && result.sharkTank && <SharkTankPanel data={result.sharkTank} />}
           {activeTab === "funeral"   && result.funeral && <FuneralPanel data={result.funeral} />}

@@ -5,7 +5,6 @@ import { parseFile } from "@/lib/fileParser";
 import {
   runMegaBatch,
   generateAiroast,
-  portfolioRoast,
   RoastContext,
   RoastLevel,
   FullRoastResult,
@@ -39,7 +38,7 @@ function checkRateLimit(ip: string): boolean {
 
 // In-memory cache fallback so shared links work without a database
 const resultCache = new Map<string, { result: unknown; createdAt: number }>();
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour — refreshed on each access
 
 // ── URL result cache ──────────────────────────────────────────────────────
 // Same URL + mode + roastLevel within 30 min = instant result, 0 API calls.
@@ -154,10 +153,7 @@ export async function POST(req: NextRequest) {
     // We defer generateAiroast to a separate lazy GET call to keep initial
     // request well under the Vercel Hobby 10-second serverless execution limit.
     const megaBatch = await runMegaBatch(ctx);
-    const { audit, ux, personas, sharkTank, funeral, actionPlan } = megaBatch;
-
-    // Call 2 (optional): portfolio mode only
-    const portfolio = mode === "portfolio" ? await portfolioRoast(ctx) : undefined;
+    const { audit, ux, personas, sharkTank, funeral, actionPlan, portfolio } = megaBatch;
 
     const fullResult: FullRoastResult = {
       audit,
@@ -170,7 +166,7 @@ export async function POST(req: NextRequest) {
       mode,
       aiRoast: "", // Populated lazily on demand
       ...(portfolio ? { portfolio } : {}),
-      scrapedText, // Cached to allow lazy generation
+      scrapedText, // Needed for lazy narrative generation
       description,
     };
 
@@ -237,6 +233,9 @@ export async function GET(req: NextRequest) {
 
   if (cachedEntry && Date.now() - cachedEntry.createdAt < CACHE_TTL_MS) {
     roastData = cachedEntry.result as FullRoastResult;
+    mode = roastData.mode || mode;
+    // Refresh TTL on access so shared links stay alive longer
+    resultCache.set(id, { result: roastData, createdAt: Date.now() });
   } else {
     const dbRoast = await getRoastById(id);
     if (dbRoast) {
@@ -257,7 +256,7 @@ export async function GET(req: NextRequest) {
     try {
       const { generateAiroast } = await import("@/lib/cerebras");
       const ctx: RoastContext = {
-        mode: roastData.portfolio ? "portfolio" : "product",
+        mode: roastData.mode || (roastData.portfolio ? "portfolio" : "product"),
         roastLevel: roastData.roastLevel,
         url: inputUrl,
         scrapedText: roastData.scrapedText || "",

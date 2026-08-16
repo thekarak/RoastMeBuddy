@@ -235,6 +235,7 @@ async function callCerebras(
   const { jsonMode = true, timeout = 45000, temperature = 0.3 } = opts;
   const key = getApiKey();
   const MAX_RETRIES = 3;
+  let useJsonMode = jsonMode;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -247,17 +248,32 @@ async function callCerebras(
         body: JSON.stringify({
           model: MODEL,
           messages: [
-            { role: "user", content: prompt }
+            { role: "system", content: jsonMode
+              ? "You are a precise analyst. Return ONLY valid JSON — no markdown fences, no commentary."
+              : "You are a witty roast comedian. Return plain text only — no JSON, no labels." },
+            { role: "user", content: prompt },
           ],
           temperature,
-          ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+          ...(useJsonMode ? { response_format: { type: "json_object" } } : {}),
         }),
         signal: AbortSignal.timeout(timeout),
       });
 
-      if (res.status === 401 || res.status === 403 || res.status === 400) {
-        const errText = await res.text().catch(() => "Unauthorized/Invalid Request");
+      if (res.status === 401 || res.status === 403) {
+        const errText = await res.text().catch(() => "Unauthorized");
         throw new Error(`OpenCode Zen Authentication/Request Error (${res.status}): ${errText}`);
+      }
+
+      // Some models reject response_format — retry once without it
+      if (res.status === 400 && useJsonMode) {
+        console.warn("OpenCode Zen rejected json_mode — retrying without response_format");
+        useJsonMode = false;
+        continue;
+      }
+
+      if (res.status === 400) {
+        const errText = await res.text().catch(() => "Bad Request");
+        throw new Error(`OpenCode Zen Request Error (400): ${errText}`);
       }
 
       if (res.status === 429 && attempt < MAX_RETRIES) {
@@ -343,11 +359,36 @@ function normalizeFuneral(d: any): FuneralResult {
 }
 
 function parseJSON<T>(text: string, fallback: T): T {
-  try { return JSON.parse(text); } catch { /* try fence strip */ }
-  try {
-    const m = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-    if (m) return JSON.parse(m[1].trim());
-  } catch { /* fall through */ }
+  if (!text?.trim()) return fallback;
+
+  const attempts = [
+    () => JSON.parse(text),
+    () => {
+      const m = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (m) return JSON.parse(m[1].trim());
+      throw new Error("no fence");
+    },
+    () => {
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      if (start >= 0 && end > start) return JSON.parse(text.slice(start, end + 1));
+      throw new Error("no object");
+    },
+    () => {
+      // Repair truncated JSON by closing open braces/brackets
+      const start = text.indexOf("{");
+      if (start < 0) throw new Error("no start");
+      let repaired = text.slice(start);
+      const opens = (repaired.match(/[{[]/g) || []).length;
+      const closes = (repaired.match(/[}\]]/g) || []).length;
+      for (let i = 0; i < opens - closes; i++) repaired += "}";
+      return JSON.parse(repaired);
+    },
+  ];
+
+  for (const attempt of attempts) {
+    try { return attempt(); } catch { /* next */ }
+  }
   return fallback;
 }
 
@@ -368,6 +409,7 @@ export async function runMegaBatch(ctx: RoastContext): Promise<{
   sharkTank?: SharkTankResult;
   funeral?: FuneralResult;
   actionPlan: ActionPlanResult;
+  portfolio?: PortfolioResult;
 }> {
   if (ctx.mode === "portfolio") {
     return runPortfolioMegaBatch(ctx);
@@ -495,7 +537,7 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
   };
 }
 
-// ── Portfolio/CV Mega-Batch — separate prompt, no sharkTank/funeral ──────
+// ── Portfolio/CV Mega-Batch — single call with hiring manager panel ──────
 async function runPortfolioMegaBatch(ctx: RoastContext): Promise<{
   audit: AuditResult;
   ux: UXResult;
@@ -503,6 +545,7 @@ async function runPortfolioMegaBatch(ctx: RoastContext): Promise<{
   sharkTank?: undefined;
   funeral?: undefined;
   actionPlan: ActionPlanResult;
+  portfolio: PortfolioResult;
 }> {
   const personaDefs = [
     { name: "Recruiter", emoji: "🔍", color: "#FF4500" },
@@ -571,6 +614,11 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
     "thisWeek":    [{"action":"","impact":"High","effort":"Low"},{"action":"","impact":"High","effort":"Low"},{"action":"","impact":"High","effort":"Low"}],
     "thisSprint":  [{"action":"","impact":"High","effort":"Medium"},{"action":"","impact":"High","effort":"Medium"},{"action":"","impact":"High","effort":"Medium"}],
     "thisQuarter": [{"action":"","impact":"High","effort":"High"},{"action":"","impact":"High","effort":"High"},{"action":"","impact":"High","effort":"High"}]
+  },
+  "portfolio": {
+    "summary": "",
+    "topIssues": [],
+    "recruiterVerdict": ""
   }
 }`;
 
@@ -578,6 +626,31 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
   const text = ctx.scrapedText || ctx.description || "";
   const cvScores = computeCVScores(text);
   const computedActionPlan = generateCVActionPlan(cvScores);
+
+  function buildPortfolioResult(aiPortfolio: Record<string, unknown> | undefined): PortfolioResult {
+    return {
+      overallScore: cvScores.overallScore,
+      firstImpression: cvScores.uxScore,
+      caseStudyDepth: cvScores.problemClarity,
+      designTaste: cvScores.visualHierarchy,
+      skillProof: cvScores.differentiation,
+      ctaScore: cvScores.ctaPlacement,
+      summary: String(aiPortfolio?.summary || "CV analysis based on content review."),
+      topIssues: Array.isArray(aiPortfolio?.topIssues) ? ns(aiPortfolio.topIssues) : [],
+      recruiterVerdict: String(aiPortfolio?.recruiterVerdict || "Needs stronger quantified achievements and clearer positioning."),
+    };
+  }
+
+  function mergeActionPlans(ai: ActionPlanResult | undefined, computed: ActionPlanResult): ActionPlanResult {
+    if (!ai || (!ai.thisWeek?.length && !ai.thisSprint?.length && !ai.thisQuarter?.length)) {
+      return computed;
+    }
+    return {
+      thisWeek: ai.thisWeek?.length ? ai.thisWeek : computed.thisWeek,
+      thisSprint: ai.thisSprint?.length ? ai.thisSprint : computed.thisSprint,
+      thisQuarter: ai.thisQuarter?.length ? ai.thisQuarter : computed.thisQuarter,
+    };
+  }
 
   let raw = "";
   try {
@@ -589,7 +662,6 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
 
   if (!d || !d.audit || !d.ux) {
     console.warn("OpenCode Zen failed or rate-limited for portfolio — using fallback local engine.");
-    // Fall back to fully computed result
     return {
       audit: {
         overallScore: cvScores.overallScore,
@@ -597,27 +669,31 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
         valueProp: cvScores.valueProp,
         differentiation: cvScores.differentiation,
         positioning: cvScores.positioning,
-        summary: "CV analysis based on content review.",
-        strengths: ["Analysis available"],
-        weaknesses: ["Full AI review unavailable"],
+        summary: "CV analysis based on structural content review.",
+        strengths: cvScores.overallScore >= 60 ? ["Solid foundation detected"] : ["Room for improvement identified"],
+        weaknesses: cvScores.problemClarity < 60 ? ["Achievements need quantified metrics"] : ["Could sharpen differentiation"],
       },
       ux: {
         score: cvScores.uxScore,
         visualHierarchy: cvScores.visualHierarchy,
         ctaPlacement: cvScores.ctaPlacement,
         trustSignals: cvScores.trustSignals,
-        frictionPoints: [],
-        criticalIssues: [],
-        warnings: [],
-        quickWins: [],
+        frictionPoints: cvScores.visualHierarchy < 50 ? ["Section structure needs clearer hierarchy"] : [],
+        criticalIssues: cvScores.ctaPlacement < 40 ? ["Contact info not prominent enough"] : [],
+        warnings: cvScores.trustSignals < 50 ? ["Add LinkedIn/GitHub links for credibility"] : [],
+        quickWins: ["Add metrics to top 3 bullet points", "Move contact info to header"],
       },
-      personas: personaDefs.map(p => ({
+      personas: personaDefs.map((p, i) => ({
         persona: p.name, emoji: p.emoji, color: p.color,
-        firstImpression: "N/A", mainObjection: "N/A", verdict: "N/A", score: cvScores.overallScore,
+        firstImpression: i === 0 ? "Scannable layout but needs stronger hook." : i === 1 ? "Experience listed but impact unclear." : "Skills present but proof of depth lacking.",
+        mainObjection: i === 0 ? "Where are the quantified results?" : i === 1 ? "What makes this candidate different?" : "Show me the code/projects.",
+        verdict: cvScores.overallScore >= 60 ? "Worth a phone screen with revisions." : "Needs significant rework before applying.",
+        score: i === 0 ? Math.min(92, cvScores.overallScore + 5) : i === 1 ? cvScores.overallScore : Math.max(10, cvScores.overallScore - 5),
       })),
       sharkTank: undefined,
       funeral: undefined,
       actionPlan: computedActionPlan,
+      portfolio: buildPortfolioResult(undefined),
     };
   }
 
@@ -653,7 +729,8 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
     personas,
     sharkTank: undefined,
     funeral: undefined,
-    actionPlan: computedActionPlan,
+    actionPlan: mergeActionPlans(d?.actionPlan, computedActionPlan),
+    portfolio: buildPortfolioResult(d?.portfolio),
   };
 }
 

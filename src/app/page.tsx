@@ -184,10 +184,17 @@ export default function HomePage() {
       }
 
       if (!res.ok) throw new Error(data.error || "Failed");
-      
+
+      // Persist full result for result page + narrative generation
+      sessionStorage.setItem(`roast_${data.id}`, JSON.stringify(data.result));
+
       // Start cooldown timer (skip if it was a cache hit)
       if (!data.cached) localStorage.setItem("lastRoastTime", Date.now().toString());
-      const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data.result))));
+
+      // Shareable hash excludes bulky scrapedText — kept in sessionStorage/API cache
+      const shareResult = { ...data.result };
+      delete shareResult.scrapedText;
+      const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(shareResult))));
       router.push(`/roast/${data.id}#${encoded}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
