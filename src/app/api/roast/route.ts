@@ -95,6 +95,22 @@ export async function POST(req: NextRequest) {
     }
 
     const contentType = req.headers.get("content-type") || "";
+    const { searchParams } = new URL(req.url);
+
+    // Direct narrative generation request
+    if (searchParams.get("type") === "narrative") {
+      const body = await req.json();
+      const { generateAiroast } = await import("@/lib/opencode");
+      const ctx: RoastContext = {
+        mode: (body.mode as "product" | "portfolio") || "portfolio",
+        roastLevel: (body.roastLevel as RoastLevel) || "medium",
+        url: body.url,
+        scrapedText: body.scrapedText || "",
+        description: body.description || "",
+      };
+      const aiRoast = await generateAiroast(ctx);
+      return NextResponse.json({ aiRoast });
+    }
     let url: string | undefined;
     let mode: "product" | "portfolio" = "product";
     let roastLevel: RoastLevel = "medium";
@@ -241,46 +257,46 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  if (!roastData) return NextResponse.json({ error: "Roast not found" }, { status: 404 });
-
-  // 2. If client is requesting lazy AI Roast text narrative
-  if (type === "narrative") {
-    // Serve cached narrative, but if it was a failed fallback ("unavailable"), retry generation
-    if (roastData.aiRoast && !roastData.aiRoast.includes("unavailable")) {
-      return NextResponse.json({ aiRoast: roastData.aiRoast });
-    }
-
-    try {
-      const { generateAiroast } = await import("@/lib/opencode");
-      const ctx: RoastContext = {
-        mode: roastData.mode || (roastData.portfolio ? "portfolio" : "product"),
-        roastLevel: roastData.roastLevel,
-        url: inputUrl,
-        scrapedText: roastData.scrapedText || "",
-        description: roastData.description || "",
-      };
-
-      const generatedRoast = await generateAiroast(ctx);
-
-      roastData.aiRoast = generatedRoast;
-
-      // Only cache successful results for reuse; failed fallbacks stay retryable
-      if (!generatedRoast.includes("unavailable")) {
-        resultCache.set(id, { result: roastData, createdAt: Date.now() });
-      } else {
-        // Clear stale empty aiRoast so next retry regenerates
-        roastData.aiRoast = "";
-        resultCache.set(id, { result: roastData, createdAt: Date.now() });
+    // 2. If client is requesting lazy AI Roast text narrative
+    if (type === "narrative") {
+      // Serve cached narrative if valid
+      if (roastData?.aiRoast && !roastData.aiRoast.includes("unavailable")) {
+        return NextResponse.json({ aiRoast: roastData.aiRoast });
       }
 
-      updateRoastInDb(id, roastData);
+      try {
+        const { generateAiroast } = await import("@/lib/opencode");
+        const ctx: RoastContext = {
+          mode: roastData?.mode || (roastData?.portfolio ? "portfolio" : "product"),
+          roastLevel: roastData?.roastLevel || "medium",
+          url: inputUrl,
+          scrapedText: roastData?.scrapedText || "",
+          description: roastData?.description || "",
+        };
 
-      return NextResponse.json({ aiRoast: generatedRoast });
-    } catch (err) {
-      console.error("Lazy aiRoast generation failed:", err);
-      return NextResponse.json({ error: "Failed to generate AI roast narrative." }, { status: 500 });
+        const generatedRoast = await generateAiroast(ctx);
+
+        if (roastData) {
+          roastData.aiRoast = generatedRoast;
+          resultCache.set(id, { result: roastData, createdAt: Date.now() });
+          updateRoastInDb(id, roastData);
+        }
+
+        return NextResponse.json({ aiRoast: generatedRoast });
+      } catch (err) {
+        console.error("Lazy aiRoast generation failed:", err);
+        const { generateLocalRoastNarrative } = await import("@/lib/opencode");
+        const fallback = generateLocalRoastNarrative({
+          mode: roastData?.mode || "portfolio",
+          roastLevel: "medium",
+          scrapedText: roastData?.scrapedText || "",
+          description: roastData?.description || "",
+        });
+        return NextResponse.json({ aiRoast: fallback });
+      }
     }
-  }
+
+    if (!roastData) return NextResponse.json({ error: "Roast not found" }, { status: 404 });
 
   return NextResponse.json({ id, result: roastData });
 }

@@ -370,14 +370,13 @@ async function callCerebras(
         throw new Error(`OpenCode Zen Authentication/Request Error (${res.status}): ${errText}`);
       }
 
-      // Some models reject response_format — retry once without it
-      if (res.status === 400 && useJsonMode) {
-        console.warn("OpenCode Zen rejected json_mode — retrying without response_format");
-        useJsonMode = false;
-        continue;
-      }
-
+      // Some models reject response_format or system message — retry with combined prompt
       if (res.status === 400) {
+        if (useJsonMode) {
+          console.warn("OpenCode Zen rejected json_mode — retrying without response_format");
+          useJsonMode = false;
+          continue;
+        }
         const errText = await res.text().catch(() => "Bad Request");
         throw new Error(`OpenCode Zen Request Error (400): ${errText}`);
       }
@@ -851,6 +850,42 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
   };
 }
 
+// ── Local Comedy Roast Generator (Deterministic Fallback) ────────────────
+export function generateLocalRoastNarrative(ctx: RoastContext): string {
+  const text = ctx.scrapedText || ctx.description || "";
+  const isCV = ctx.mode === "portfolio";
+  const scores = computeCVScores(text);
+
+  if (isCV) {
+    const openings = [
+      "Let's be completely honest: this CV reads like it was written by someone trying to explain their job to their grandmother while dodging every single question about actual results.",
+      "I opened this CV expecting a compelling career trajectory, but what I found was an adventure in creative formatting and bullet points that bravely say nothing.",
+      "Welcome to the hiring manager's twilight zone. This CV has all the buzzwords of a Fortune 500 executive and all the measurable impact of a spectator.",
+    ];
+
+    const opening = openings[Math.floor(Math.random() * openings.length)];
+
+    const body1 = scores.problemClarity < 55
+      ? "First off, your experience section is suffering from an acute allergy to numbers. You 'collaborated with cross-functional teams' and 'spearheaded strategic initiatives' — but did you actually move a single KPI, or did you just attend meetings and nod attentively? Recruiters don't want a passive list of job duties; they want indisputable proof you didn't just warm an office chair."
+      : "You've got some solid experience listed, but the way it's framed makes it sound like you're apologizing for having worked there. Bold claims require bold proof, yet your strongest achievements are buried under paragraphs of generic responsibilities.";
+
+    const body2 = scores.positioning < 60
+      ? "Your summary reads like every LinkedIn thought leader had a baby and gave it a template from 2016. 'Passionate, results-driven professional looking to leverage synergies.' If I took a shot every time someone put those exact words on a resume, I'd have alcohol poisoning before getting past the header."
+      : "Your positioning tries to be everything to everyone — developer, designer, strategist, and probably part-time barista. When you pitch yourself as a universal Swiss Army knife, companies just assume every single blade is dull.";
+
+    const closings = [
+      "Verdict: Treat your CV like production code. Delete the fluff, quantify every accomplishment, and give recruiters an undeniable reason to schedule a phone screen before this resume gets recycled.",
+      "Verdict: Rewrite those bullet points with actual metrics, cut the corporate jargon in half, and let your real skills do the talking. You've got potential — stop hiding it behind buzzwords.",
+      "Verdict: Stop describing what your team did and start owning what YOU delivered. Add numbers, sharpen the pitch, and make hiring managers actually stop scrolling.",
+    ];
+    const closing = closings[Math.floor(Math.random() * closings.length)];
+
+    return `${opening}\n\n${body1}\n\n${body2}\n\n${closing}`;
+  } else {
+    return "Let's talk about this product landing page. The hero headline promises to 'revolutionize your workflow', but by the time a visitor scrolls past the generic illustration, they still have zero clue what the product actually does.\n\nYour primary call to action is playing hide-and-seek below the fold, while your value proposition is drowning in corporate buzzwords. If your conversion rate was a heart rate monitor, the doctor would be calling time of death.\n\nVerdict: Move your main CTA front and center, replace the generic headline with a concrete benefit, and give users a compelling reason to click in the first 5 seconds.";
+  }
+}
+
 // ── CALL 2: AI Roast narrative — 1 API call (plain text) ──────────────────
 export async function generateAiroast(ctx: RoastContext): Promise<string> {
   const toneMap = {
@@ -869,10 +904,14 @@ ${buildContext(ctx, 1200)}`;
   try {
     text = await callCerebras(prompt, { jsonMode: false, timeout: 45000, systemPrompt });
   } catch (err) {
-    console.error("OpenCode Zen narrative roast failed:", err);
+    console.warn("OpenCode Zen narrative roast call failed — falling back to local roast narrative:", err);
   }
-  const noun = ctx.mode === "portfolio" ? "CV" : "product";
-  return text || `The comedy roast narrative is unavailable — the AI backend failed to respond. Please try again later. (CV/product: ${noun})`;
+
+  if (!text || text.trim().length < 40 || text.includes("unavailable")) {
+    return generateLocalRoastNarrative(ctx);
+  }
+
+  return text;
 }
 
 // ── CALL 3 (optional): Portfolio — only runs when mode=portfolio ───────────

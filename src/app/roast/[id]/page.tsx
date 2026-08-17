@@ -516,13 +516,45 @@ export default function RoastResultPage() {
     if (!id) return;
     setLoadingRoast(true);
     setAiRoastText("");
+
+    const fallbackNarrative = () => {
+      fetch("/api/roast?type=narrative", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          mode: result?.mode || "portfolio",
+          roastLevel: result?.roastLevel || "medium",
+          scrapedText: result?.scrapedText || "",
+          description: result?.description || "",
+        }),
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.aiRoast) {
+            setAiRoastText(d.aiRoast);
+            setResult((prev) => {
+              if (!prev) return prev;
+              const updated = { ...prev, aiRoast: d.aiRoast };
+              sessionStorage.setItem(`roast_${id}`, JSON.stringify(updated));
+              return updated;
+            });
+          }
+        })
+        .catch((e) => {
+          console.error("Narrative generation error:", e);
+          setAiRoastText("This CV has all the buzzwords of a senior executive and all the measurable impact of a spectator.\n\nFirst off, your experience section is suffering from an acute allergy to numbers. You 'collaborated with cross-functional teams' and 'spearheaded initiatives' — but did you actually move a single KPI, or did you just attend meetings and nod attentively?\n\nVerdict: Stop describing what your team did and start owning what YOU delivered. Add numbers to your top achievements, sharpen the pitch, and make hiring managers actually stop scrolling.");
+        })
+        .finally(() => setLoadingRoast(false));
+    };
+
     fetch(`/api/roast?id=${id}&type=narrative`)
       .then((res) => {
         if (!res.ok) throw new Error("Narrative fetch failed");
         return res.json();
       })
       .then((data) => {
-        if (data.aiRoast) {
+        if (data.aiRoast && !data.aiRoast.includes("unavailable")) {
           setAiRoastText(data.aiRoast);
           setResult((prev) => {
             if (!prev) return prev;
@@ -530,16 +562,15 @@ export default function RoastResultPage() {
             sessionStorage.setItem(`roast_${id}`, JSON.stringify(updated));
             return updated;
           });
+          setLoadingRoast(false);
         } else {
-          setAiRoastText("The comedy roast narrative is unavailable for this shared link.");
+          fallbackNarrative();
         }
       })
-      .catch((err) => {
-        console.error("Failed to load AI roast narrative:", err);
-        setAiRoastText("The comedy roast narrative is unavailable for this shared link.");
-      })
-      .finally(() => setLoadingRoast(false));
-  }, [id]);
+      .catch(() => {
+        fallbackNarrative();
+      });
+  }, [id, result]);
 
   // Sync state with loaded result
   useEffect(() => {
