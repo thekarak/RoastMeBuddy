@@ -729,16 +729,18 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
   const cvScores = computeCVScores(text);
   const computedActionPlan = generateCVActionPlan(cvScores);
 
-  function buildPortfolioResult(aiPortfolio: Record<string, unknown> | undefined, blended: { audit: AuditResult; ux: UXResult } | undefined): PortfolioResult {
-    const a = blended?.audit || audit;
-    const u = blended?.ux || ux;
+  function createPortfolioResult(
+    aiPortfolio: Record<string, unknown> | undefined,
+    targetAudit: AuditResult,
+    targetUX: UXResult
+  ): PortfolioResult {
     return {
-      overallScore: a.overallScore,
-      firstImpression: u.score,
-      caseStudyDepth: a.problemClarity,
-      designTaste: u.visualHierarchy,
-      skillProof: a.differentiation,
-      ctaScore: u.ctaPlacement,
+      overallScore: targetAudit.overallScore,
+      firstImpression: targetUX.score,
+      caseStudyDepth: targetAudit.problemClarity,
+      designTaste: targetUX.visualHierarchy,
+      skillProof: targetAudit.differentiation,
+      ctaScore: targetUX.ctaPlacement,
       summary: String(aiPortfolio?.summary || "CV analysis based on content review."),
       topIssues: Array.isArray(aiPortfolio?.topIssues) ? ns(aiPortfolio.topIssues) : [],
       recruiterVerdict: String(aiPortfolio?.recruiterVerdict || "Needs stronger quantified achievements and clearer positioning."),
@@ -766,27 +768,30 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
 
   if (!d || !d.audit || !d.ux) {
     console.warn("OpenCode Zen failed or rate-limited for portfolio — using fallback local engine.");
+    const fallbackAudit: AuditResult = {
+      overallScore: cvScores.overallScore,
+      problemClarity: cvScores.problemClarity,
+      valueProp: cvScores.valueProp,
+      differentiation: cvScores.differentiation,
+      positioning: cvScores.positioning,
+      summary: "CV analysis based on structural content review.",
+      strengths: cvScores.overallScore >= 60 ? ["Solid foundation detected"] : ["Room for improvement identified"],
+      weaknesses: cvScores.problemClarity < 60 ? ["Achievements need quantified metrics"] : ["Could sharpen differentiation"],
+    };
+    const fallbackUX: UXResult = {
+      score: cvScores.uxScore,
+      visualHierarchy: cvScores.visualHierarchy,
+      ctaPlacement: cvScores.ctaPlacement,
+      trustSignals: cvScores.trustSignals,
+      frictionPoints: cvScores.visualHierarchy < 50 ? ["Section structure needs clearer hierarchy"] : [],
+      criticalIssues: cvScores.ctaPlacement < 40 ? ["Contact info not prominent enough"] : [],
+      warnings: cvScores.trustSignals < 50 ? ["Add LinkedIn/GitHub links for credibility"] : [],
+      quickWins: ["Add metrics to top 3 bullet points", "Move contact info to header"],
+    };
+
     return {
-      audit: {
-        overallScore: cvScores.overallScore,
-        problemClarity: cvScores.problemClarity,
-        valueProp: cvScores.valueProp,
-        differentiation: cvScores.differentiation,
-        positioning: cvScores.positioning,
-        summary: "CV analysis based on structural content review.",
-        strengths: cvScores.overallScore >= 60 ? ["Solid foundation detected"] : ["Room for improvement identified"],
-        weaknesses: cvScores.problemClarity < 60 ? ["Achievements need quantified metrics"] : ["Could sharpen differentiation"],
-      },
-      ux: {
-        score: cvScores.uxScore,
-        visualHierarchy: cvScores.visualHierarchy,
-        ctaPlacement: cvScores.ctaPlacement,
-        trustSignals: cvScores.trustSignals,
-        frictionPoints: cvScores.visualHierarchy < 50 ? ["Section structure needs clearer hierarchy"] : [],
-        criticalIssues: cvScores.ctaPlacement < 40 ? ["Contact info not prominent enough"] : [],
-        warnings: cvScores.trustSignals < 50 ? ["Add LinkedIn/GitHub links for credibility"] : [],
-        quickWins: ["Add metrics to top 3 bullet points", "Move contact info to header"],
-      },
+      audit: fallbackAudit,
+      ux: fallbackUX,
       personas: personaDefs.map((p, i) => ({
         persona: p.name, emoji: p.emoji, color: p.color,
         firstImpression: i === 0 ? "Scannable layout but needs stronger hook." : i === 1 ? "Experience listed but impact unclear." : "Skills present but proof of depth lacking.",
@@ -797,7 +802,7 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
       sharkTank: undefined,
       funeral: undefined,
       actionPlan: computedActionPlan,
-      portfolio: buildPortfolioResult(undefined, undefined),
+      portfolio: createPortfolioResult(undefined, fallbackAudit, fallbackUX),
     };
   }
 
@@ -838,7 +843,7 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
     sharkTank: undefined,
     funeral: undefined,
     actionPlan: mergeActionPlans(d?.actionPlan, computedActionPlan),
-    portfolio: buildPortfolioResult(d?.portfolio, { audit, ux }),
+    portfolio: createPortfolioResult(d?.portfolio, audit, ux),
   };
 }
 
