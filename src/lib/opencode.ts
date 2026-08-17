@@ -1,4 +1,4 @@
-// lib/cerebras.ts — OpenCode Zen API (DeepSeek V4 Flash free)
+// lib/opencode.ts — OpenCode Zen API (DeepSeek V4 Flash free)
 const MODEL = "deepseek-v4-flash-free";
 const ZEN_BASE_URL = "https://opencode.ai/zen/v1/chat/completions";
 
@@ -124,46 +124,132 @@ export interface FullRoastResult {
 }
 
 // ── Local CV scoring engine ───────────────────────────────────────────────
+function clamp(v: number): number {
+  return Math.max(0, Math.min(100, Math.round(v)));
+}
+
+function blendScores(aiScore: number, localScore: number, weight = 0.4): number {
+  return clamp(Math.round(localScore * (1 - weight) + aiScore * weight));
+}
+
 function computeCVScores(text: string): {
   overallScore: number; problemClarity: number; valueProp: number;
   differentiation: number; positioning: number;
   uxScore: number; visualHierarchy: number; ctaPlacement: number; trustSignals: number;
 } {
   const t = text.toLowerCase();
-  const wc = text.split(/\s+/).length;
+  const wc = text.split(/\s+/).filter((w) => w.length > 0).length;
 
+  // ── Contact & credibility signals ──
   const hasEmail = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(text);
   const hasPhone = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/.test(text);
-  const hasLinkedIn = /linkedin/i.test(t);
-  const hasGitHub = /github/i.test(t);
+  const hasLinkedIn = /linkedin\.com/i.test(text) || /linkedin/i.test(t);
+  const hasGitHub = /github\.com/i.test(text) || /github/i.test(t);
+  const hasPortfolioLink = /(https?:\/\/)[^\s]*?(portfolio|personal|work|projects)/i.test(text);
 
-  const hasEducation   = /\b(education|degree|bachelor|master|phd|b\.sc|m\.sc|ba|ma|bs|university|college)\b/i.test(t);
-  const hasExperience  = /\b(experience|employment|work history|professional|career)\b/i.test(t);
-  const hasSkills      = /\b(skills|technologies|competencies|proficiencies|expertise|programming|languages)\b/i.test(t);
-  const hasProjects    = /\b(projects|portfolio|repository|open.?source)\b/i.test(t);
-  const hasCerts       = /\b(certified|certification|license|credential)\b/i.test(t);
-  const sectionCount = [hasEducation, hasExperience, hasSkills, hasProjects, hasCerts].filter(Boolean).length;
+  // ── Section structure (header detection is more precise) ──
+  const hasEducation = /\b(education|degrees?|academic|qualifications)/i.test(t);
+  const hasExperience = /\b(experience|professional history|work history|career timeline)/i.test(t);
+  const hasSkills = /\b(skills|technical skills|competencies|proficiencies|expertise)/i.test(t);
+  const hasProjects = /\b(projects|portfolio|case studies|open.?source)/i.test(t);
+  const hasCerts = /\b(certifications?|certified|licensed|credentials)/i.test(t);
+  const hasSummary = /\b(summary|profile|professional summary|about me|career objective)/i.test(t);
 
-  const quantified = (text.match(/\d+%|\$\d+|increased|decreased|improved|reduced|generated|saved|grew|boosted|delivered|achieved|led|managed|spearheaded/gi) || []).length;
-  const actionVerbs = (text.match(/\b(developed|implemented|created|designed|launched|optimized|transformed|built|engineered|architected|established|automated|migrated|scaled|integrated)\b/gi) || []).length;
+  const sections = { hasEducation, hasExperience, hasSkills, hasProjects, hasCerts, hasSummary };
+  const sectionCount = Object.values(sections).filter(Boolean).length;
 
-  const depth = Math.min(1, wc / 400);
-  const hasSections = sectionCount >= 3;
+  // ── Quantified achievement detection ──
+  const quantifiedMatches = text.match(
+    /\b\d+%|\$\d+(?:\.\d+)?[km]?(?:m|b)?|\d+(?:\.\d+)?\s*(?:users|customers|clients|subscribers|visitors|conversions|leads|sales|revenue|downloads|engagement|CTR|CAC|LTV|ROI|NPS|CSAT|months?|years?|hours?)\b/gi
+  );
+  const quantified = quantifiedMatches ? quantifiedMatches.length : 0;
+
+  // ── Action verb detection ──
+  const actionVerbs = (text.match(
+    /\b(developed|implemented|created|designed|launched|optimized|transformed|built|engineered|architected|established|automated|migrated|scaled|integrated|spearheaded|led|managed|pioneered|orchestrated|negotiated|delivered)\b/gi
+  ) || []).length;
+
+  // ── Content depth (normalized to 100–1500 word range) ──
+  const depth = Math.min(1, Math.max(0, (wc - 100) / 1400));
+  const hasSections = sectionCount >= 4;
   const hasMetrics = quantified >= 2;
+  const quantifiedRatio = wc > 50 ? Math.min(1, quantified / Math.max(1, wc / 60)) : 0;
 
-  const achievementClarity = Math.round(Math.min(92, 20 + quantified * 6 + actionVerbs * 3 + depth * 10));
-  const valueScore = Math.round(Math.min(92, 20 + sectionCount * 8 + (hasMetrics ? 12 : 0) + depth * 8 + (hasLinkedIn ? 5 : 0)));
-  const diffScore = Math.round(Math.min(92, 18 + actionVerbs * 4 + quantified * 4 + (hasProjects ? 8 : 0) + (hasCerts ? 5 : 0)));
-  const posScore = Math.round(Math.min(92, 22 + (hasEmail ? 6 : 0) + (hasPhone ? 4 : 0) + (hasSections ? 10 : 0) + depth * 5));
-  const overall = Math.round((achievementClarity + valueScore + diffScore + posScore) / 4);
+  // ── Achievement Clarity (problemClarity) ──
+  // Weight: quantified results 45%, action verbs 20%, depth 20%, ratio 15%
+  const problemClarity = clamp(Math.round(
+    20 +
+    quantified * 7 +
+    actionVerbs * 3 +
+    depth * 15 +
+    (quantifiedRatio > 0.1 ? 10 : 0) +
+    (quantifiedRatio > 0.25 ? 8 : 0)
+  ));
 
-  const uxScore = Math.round(Math.min(92, 35 + depth * 15 + (hasSections ? 10 : 0) + ((hasLinkedIn || hasGitHub) ? 5 : 0)));
-  const vh = Math.round(Math.min(92, 30 + depth * 20 + (hasSections ? 10 : 0)));
-  const cta = Math.round(Math.min(92, 20 + (hasEmail ? 15 : 0) + (hasPhone ? 8 : 0) + (hasLinkedIn ? 10 : 0) + (hasGitHub ? 8 : 0)));
-  const trust = Math.round(Math.min(92, 25 + (hasLinkedIn ? 12 : 0) + (hasGitHub ? 8 : 0) + (hasCerts ? 8 : 0) + depth * 5));
+  // ── Value Prop ──
+  // How well the CV sells the candidate's unique value
+  const valueProp = clamp(Math.round(
+    15 +
+    (hasSummary ? 12 : 0) +
+    sectionCount * 5 +
+    (hasMetrics ? 12 : 0) +
+    depth * 8 +
+    (hasLinkedIn ? 5 : 0) +
+    (quantified > 3 ? 8 : 0)
+  ));
+
+  // ── Differentiation ──
+  // What makes the candidate stand out
+  const diffScore = clamp(Math.round(
+    15 +
+    actionVerbs * 5 +
+    quantified * 3 +
+    (hasProjects ? 12 : 0) +
+    (hasCerts ? 8 : 0) +
+    depth * 5 +
+    (quantifiedRatio > 0.15 ? 8 : 0)
+  ));
+
+  // ── Positioning ──
+  // How well-tailored the CV is to target role
+  const posScore = clamp(Math.round(
+    18 +
+    (hasEmail ? 8 : 0) +
+    (hasPhone ? 5 : 0) +
+    (hasSections ? 12 : 0) +
+    depth * 6 +
+    (hasSummary ? 6 : 0)
+  ));
+
+  const overall = Math.round((problemClarity + valueProp + diffScore + posScore) / 4);
+
+  // ── UX scores (CV readability & design) ──
+  const uxScore = clamp(Math.round(
+    30 +
+    depth * 18 +
+    (hasSections ? 12 : 0) +
+    ((hasLinkedIn || hasGitHub || hasPortfolioLink) ? 10 : 0)
+  ));
+  const vh = clamp(Math.round(25 + depth * 22 + (hasSections ? 12 : 0)));
+  const cta = clamp(Math.round(
+    15 +
+    (hasEmail ? 18 : 0) +
+    (hasPhone ? 8 : 0) +
+    (hasLinkedIn ? 12 : 0) +
+    (hasGitHub ? 8 : 0) +
+    (hasPortfolioLink ? 10 : 0)
+  ));
+  const trust = clamp(Math.round(
+    20 +
+    (hasLinkedIn ? 15 : 0) +
+    (hasGitHub ? 8 : 0) +
+    (hasCerts ? 10 : 0) +
+    (hasPortfolioLink ? 8 : 0) +
+    depth * 5
+  ));
 
   return {
-    overallScore: overall, problemClarity: achievementClarity, valueProp: valueScore,
+    overallScore: overall, problemClarity, valueProp: valueProp,
     differentiation: diffScore, positioning: posScore,
     uxScore, visualHierarchy: vh, ctaPlacement: cta, trustSignals: trust,
   };
@@ -172,54 +258,67 @@ function computeCVScores(text: string): {
 function generateCVActionPlan(scores: ReturnType<typeof computeCVScores>): ActionPlanResult {
   const plan: ActionPlanResult = { thisWeek: [], thisSprint: [], thisQuarter: [] };
 
-  if (scores.problemClarity < 50) {
-    plan.thisWeek.push({ action: "Add quantified achievements to every role — use numbers, percentages, and dollar amounts", impact: "High", effort: "Low" });
-  } else if (scores.problemClarity < 70) {
-    plan.thisWeek.push({ action: "Strengthen weak bullet points with concrete results and metrics", impact: "High", effort: "Low" });
+  // ── Problem Clarity (quantified achievements) ──
+  if (scores.problemClarity < 45) {
+    plan.thisWeek.push({ action: "Add quantified metrics to every bullet point — use %, $, and timeframes", impact: "High", effort: "Low" });
+  } else if (scores.problemClarity < 65) {
+    plan.thisWeek.push({ action: "Strengthen 2-3 weak bullet points with concrete results and numbers", impact: "High", effort: "Low" });
   } else {
-    plan.thisWeek.push({ action: "Fine-tune achievement descriptions for maximum impact", impact: "Medium", effort: "Low" });
+    plan.thisWeek.push({ action: "Fine-tune top achievement descriptions for maximum quantified impact", impact: "Medium", effort: "Low" });
   }
 
-  if (scores.differentiation < 40) {
-    plan.thisWeek.push({ action: "Add a skills section highlighting technical and soft skills", impact: "High", effort: "Low" });
-    plan.thisSprint.push({ action: "Build a portfolio project that demonstrates your best work", impact: "High", effort: "Medium" });
-  } else if (scores.differentiation < 65) {
+  // ── Value Prop ──
+  if (scores.valueProp < 40) {
+    plan.thisWeek.push({ action: "Write a targeted 2-sentence summary stating your unique value proposition", impact: "High", effort: "Low" });
+  } else if (scores.valueProp < 60) {
+    plan.thisWeek.push({ action: "Rewrite your professional summary to highlight your top 3 differentiators", impact: "High", effort: "Low" });
+  }
+
+  // ── Differentiation ──
+  if (scores.differentiation < 35) {
+    plan.thisWeek.push({ action: "Add a dedicated skills section with technical and soft skills", impact: "High", effort: "Low" });
+    plan.thisSprint.push({ action: "Build 1 portfolio project that showcases your best technical work", impact: "High", effort: "Medium" });
+  } else if (scores.differentiation < 55) {
     plan.thisWeek.push({ action: "Highlight unique projects and contributions that set you apart", impact: "High", effort: "Low" });
-    plan.thisSprint.push({ action: "Add relevant certifications and online courses", impact: "Medium", effort: "Medium" });
+    plan.thisSprint.push({ action: "Add relevant certifications or online courses to your skill set", impact: "Medium", effort: "Medium" });
   } else {
-    plan.thisWeek.push({ action: "Add a link to your portfolio or GitHub to provide extra proof", impact: "Medium", effort: "Low" });
+    plan.thisWeek.push({ action: "Add a link to your portfolio or GitHub for additional proof of work", impact: "Medium", effort: "Low" });
   }
 
-  if (scores.positioning < 45) {
-    plan.thisWeek.push({ action: "Write a targeted professional summary aligned with your desired role", impact: "High", effort: "Low" });
-    plan.thisQuarter.push({ action: "Network with professionals in your target industry for referrals", impact: "High", effort: "High" });
-  } else if (scores.positioning < 70) {
-    plan.thisWeek.push({ action: "Tailor your CV keywords to match job descriptions in your field", impact: "High", effort: "Low" });
-    plan.thisQuarter.push({ action: "Pursue an advanced certification or specialisation in your domain", impact: "High", effort: "High" });
+  // ── Positioning ──
+  if (scores.positioning < 40) {
+    plan.thisWeek.push({ action: "Restructure CV with clear sections: Summary, Experience, Education, Skills", impact: "High", effort: "Medium" });
+    plan.thisWeek.push({ action: "Add visible contact info (email, phone, LinkedIn) to the header", impact: "High", effort: "Low" });
+    plan.thisQuarter.push({ action: "Network with 20+ professionals in your target industry for referrals", impact: "High", effort: "High" });
+  } else if (scores.positioning < 65) {
+    plan.thisWeek.push({ action: "Tailor CV keywords to match 3 job descriptions in your target role", impact: "High", effort: "Low" });
+    plan.thisQuarter.push({ action: "Earn an advanced certification or specialisation in your target domain", impact: "High", effort: "High" });
   } else {
-    plan.thisSprint.push({ action: "Get your CV reviewed by peers in your target industry", impact: "Medium", effort: "Medium" });
+    plan.thisSprint.push({ action: "Get your CV reviewed by 2 peers in your target industry", impact: "Medium", effort: "Medium" });
   }
 
-  if (scores.valueProp < 50) {
-    plan.thisWeek.push({ action: "Rewrite your CV summary to clearly state your unique value proposition", impact: "High", effort: "Low" });
+  // ── CTA/Trust Signals ──
+  if (scores.ctaPlacement < 35) {
+    plan.thisWeek.push({ action: "Move contact info, LinkedIn, and GitHub links to the CV header", impact: "High", effort: "Low" });
+  }
+  if (scores.trustSignals < 40) {
+    plan.thisWeek.push({ action: "Add LinkedIn profile link and 1-2 professional certifications", impact: "High", effort: "Low" });
   }
 
-  if (scores.ctaPlacement < 40) {
-    plan.thisWeek.push({ action: "Add visible contact info, LinkedIn, and GitHub links to the top of your CV", impact: "High", effort: "Low" });
-  }
-
+  // ── Overall quality fallback ──
   if (scores.overallScore < 35) {
-    plan.thisSprint.push({ action: "Restructure your CV with clear sections: Summary, Experience, Education, Skills", impact: "High", effort: "Medium" });
+    plan.thisSprint.push({ action: "Rewrite entire CV with ATS-friendly formatting and clear section headers", impact: "High", effort: "Medium" });
   }
 
+  // ── Ensure minimum plan coverage ──
   if (plan.thisSprint.length < 2) {
-    plan.thisSprint.push({ action: "Add case studies or detailed project descriptions to demonstrate depth", impact: "High", effort: "Medium" });
+    plan.thisSprint.push({ action: "Add 2-3 detailed case studies or project descriptions demonstrating impact", impact: "High", effort: "Medium" });
   }
   if (plan.thisQuarter.length < 2) {
     plan.thisQuarter.push({ action: "Contribute to open source or build a showcase project in your field", impact: "High", effort: "High" });
   }
   if (plan.thisQuarter.length < 3) {
-    plan.thisQuarter.push({ action: "Attend industry events and build your professional network", impact: "Medium", effort: "High" });
+    plan.thisQuarter.push({ action: "Attend 3+ industry events or meetups to expand your professional network", impact: "Medium", effort: "High" });
   }
 
   return plan;
@@ -230,12 +329,17 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function callCerebras(
   prompt: string,
-  opts: { jsonMode?: boolean; timeout?: number; temperature?: number } = {}
+  opts: { jsonMode?: boolean; timeout?: number; temperature?: number; systemPrompt?: string } = {}
 ): Promise<string> {
-  const { jsonMode = true, timeout = 45000, temperature = 0.3 } = opts;
+  const { jsonMode = true, timeout = 45000, temperature = 0.3, systemPrompt } = opts;
   const key = getApiKey();
   const MAX_RETRIES = 3;
   let useJsonMode = jsonMode;
+
+  const systemMsg = systemPrompt
+    || (jsonMode
+      ? "You are a precise analyst. Return ONLY valid JSON — no markdown fences, no commentary."
+      : "You are a witty roast comedian. Return plain text only — no JSON, no labels.");
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -248,9 +352,7 @@ async function callCerebras(
         body: JSON.stringify({
           model: MODEL,
           messages: [
-            { role: "system", content: jsonMode
-              ? "You are a precise analyst. Return ONLY valid JSON — no markdown fences, no commentary."
-              : "You are a witty roast comedian. Return plain text only — no JSON, no labels." },
+            { role: "system", content: systemMsg },
             { role: "user", content: prompt },
           ],
           temperature,
@@ -627,14 +729,16 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
   const cvScores = computeCVScores(text);
   const computedActionPlan = generateCVActionPlan(cvScores);
 
-  function buildPortfolioResult(aiPortfolio: Record<string, unknown> | undefined): PortfolioResult {
+  function buildPortfolioResult(aiPortfolio: Record<string, unknown> | undefined, blended: { audit: AuditResult; ux: UXResult } | undefined): PortfolioResult {
+    const a = blended?.audit || audit;
+    const u = blended?.ux || ux;
     return {
-      overallScore: cvScores.overallScore,
-      firstImpression: cvScores.uxScore,
-      caseStudyDepth: cvScores.problemClarity,
-      designTaste: cvScores.visualHierarchy,
-      skillProof: cvScores.differentiation,
-      ctaScore: cvScores.ctaPlacement,
+      overallScore: a.overallScore,
+      firstImpression: u.score,
+      caseStudyDepth: a.problemClarity,
+      designTaste: u.visualHierarchy,
+      skillProof: a.differentiation,
+      ctaScore: u.ctaPlacement,
       summary: String(aiPortfolio?.summary || "CV analysis based on content review."),
       topIssues: Array.isArray(aiPortfolio?.topIssues) ? ns(aiPortfolio.topIssues) : [],
       recruiterVerdict: String(aiPortfolio?.recruiterVerdict || "Needs stronger quantified achievements and clearer positioning."),
@@ -688,39 +792,43 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
         firstImpression: i === 0 ? "Scannable layout but needs stronger hook." : i === 1 ? "Experience listed but impact unclear." : "Skills present but proof of depth lacking.",
         mainObjection: i === 0 ? "Where are the quantified results?" : i === 1 ? "What makes this candidate different?" : "Show me the code/projects.",
         verdict: cvScores.overallScore >= 60 ? "Worth a phone screen with revisions." : "Needs significant rework before applying.",
-        score: i === 0 ? Math.min(92, cvScores.overallScore + 5) : i === 1 ? cvScores.overallScore : Math.max(10, cvScores.overallScore - 5),
+        score: i === 0 ? Math.min(95, cvScores.overallScore + 5) : i === 1 ? cvScores.overallScore : Math.max(10, cvScores.overallScore - 5),
       })),
       sharkTank: undefined,
       funeral: undefined,
       actionPlan: computedActionPlan,
-      portfolio: buildPortfolioResult(undefined),
+      portfolio: buildPortfolioResult(undefined, undefined),
     };
   }
 
-  // Use AI text but override scores with computed ones (more reliable)
+  // Use AI text but blend scores with local computed ones for reliability.
+  // Weight: 60% local heuristic (reliable baselines), 40% AI assessment (contextual nuance).
+  // This ensures scores always reflect actual content while benefiting from AI insight.
   const audit = normalizeAudit(d?.audit || {});
   const ux = normalizeUX(d?.ux || {});
 
-  audit.overallScore = cvScores.overallScore;
-  audit.problemClarity = cvScores.problemClarity;
-  audit.valueProp = cvScores.valueProp;
-  audit.differentiation = cvScores.differentiation;
-  audit.positioning = cvScores.positioning;
-  ux.score = cvScores.uxScore;
-  ux.visualHierarchy = cvScores.visualHierarchy;
-  ux.ctaPlacement = cvScores.ctaPlacement;
-  ux.trustSignals = cvScores.trustSignals;
+  audit.overallScore = blendScores(audit.overallScore, cvScores.overallScore);
+  audit.problemClarity = blendScores(audit.problemClarity, cvScores.problemClarity);
+  audit.valueProp = blendScores(audit.valueProp, cvScores.valueProp);
+  audit.differentiation = blendScores(audit.differentiation, cvScores.differentiation);
+  audit.positioning = blendScores(audit.positioning, cvScores.positioning);
+
+  ux.score = blendScores(ux.score, cvScores.uxScore);
+  ux.visualHierarchy = blendScores(ux.visualHierarchy, cvScores.visualHierarchy);
+  ux.ctaPlacement = blendScores(ux.ctaPlacement, cvScores.ctaPlacement);
+  ux.trustSignals = blendScores(ux.trustSignals, cvScores.trustSignals);
 
   const personas = Array.isArray(d?.personas) ? d.personas : personaDefs.map(p => ({
     persona: p.name, emoji: p.emoji, color: p.color,
     firstImpression: "N/A", mainObjection: "N/A", verdict: "N/A", score: cvScores.overallScore,
   }));
 
-  // Override persona scores too
+  // Blend persona scores with local — first persona slightly higher (recruiter), last slightly lower
   personas.forEach((p: PersonaResult, i: number) => {
-    if (i === 0) p.score = Math.min(92, cvScores.overallScore + 5);
-    else if (i === 1) p.score = cvScores.overallScore;
-    else p.score = Math.max(10, cvScores.overallScore - 5);
+    const localBase = i === 0 ? Math.min(95, cvScores.overallScore + 5)
+                   : i === 1 ? cvScores.overallScore
+                   : Math.max(10, cvScores.overallScore - 5);
+    p.score = blendScores(p.score || 50, localBase);
   });
 
   return {
@@ -730,7 +838,7 @@ Return ONLY this JSON structure (no markdown fences, no extra text). Replace ALL
     sharkTank: undefined,
     funeral: undefined,
     actionPlan: mergeActionPlans(d?.actionPlan, computedActionPlan),
-    portfolio: buildPortfolioResult(d?.portfolio),
+    portfolio: buildPortfolioResult(d?.portfolio, { audit, ux }),
   };
 }
 
@@ -743,21 +851,19 @@ export async function generateAiroast(ctx: RoastContext): Promise<string> {
     brutal: "You are THE most savage roast master alive. Vicious, hilarious, devastating. No filter. Profanity welcome.",
   };
 
-  const prompt = `${toneMap[ctx.roastLevel]}
+  const systemPrompt = `${toneMap[ctx.roastLevel]} Return ONLY plain text. No JSON, no labels, no formatting.`;
 
-ROAST this ${ctx.mode} in 3-5 paragraphs — funny opening, tear into specific flaws (mention actual content), killer punchline.
-${buildContext(ctx, 1200)}
-
-Return ONLY the roast text. No JSON, no labels, no formatting.`;
+  const prompt = `ROAST this ${ctx.mode} in 3-5 paragraphs — funny opening, tear into specific flaws (mention actual content), killer punchline.
+${buildContext(ctx, 1200)}`;
 
   let text = "";
   try {
-    text = await callCerebras(prompt, { jsonMode: false, timeout: 45000 });
+    text = await callCerebras(prompt, { jsonMode: false, timeout: 45000, systemPrompt });
   } catch (err) {
-    console.warn("OpenCode Zen narrative roast failed or rate-limited:", err);
+    console.error("OpenCode Zen narrative roast failed:", err);
   }
   const noun = ctx.mode === "portfolio" ? "CV" : "product";
-  return text || `This ${noun} has solid structure, but could benefit from sharper positioning and clearer quantifiable achievements. Keep refining!`;
+  return text || `The comedy roast narrative is unavailable — the AI backend failed to respond. Please try again later. (CV/product: ${noun})`;
 }
 
 // ── CALL 3 (optional): Portfolio — only runs when mode=portfolio ───────────
@@ -781,14 +887,14 @@ Return ONLY this JSON (replace example scores with actual assessments):
   }
   const ai = parseJSON<any>(raw, {});
 
-  // Override scores with computed ones for reliability
+  // Blend AI insights with local computed scores
   return {
-    overallScore: scores.overallScore,
-    firstImpression: scores.uxScore,
-    caseStudyDepth: scores.problemClarity,
-    designTaste: scores.visualHierarchy,
-    skillProof: scores.differentiation,
-    ctaScore: scores.ctaPlacement,
+    overallScore: blendScores(Number(ai?.overallScore) || 0, scores.overallScore),
+    firstImpression: blendScores(Number(ai?.firstImpression) || 0, scores.uxScore),
+    caseStudyDepth: blendScores(Number(ai?.caseStudyDepth) || 0, scores.problemClarity),
+    designTaste: blendScores(Number(ai?.designTaste) || 0, scores.visualHierarchy),
+    skillProof: blendScores(Number(ai?.skillProof) || 0, scores.differentiation),
+    ctaScore: blendScores(Number(ai?.ctaScore) || 0, scores.ctaPlacement),
     summary: String(ai?.summary || ""),
     topIssues: Array.isArray(ai?.topIssues) ? ai.topIssues : [],
     recruiterVerdict: String(ai?.recruiterVerdict || ""),

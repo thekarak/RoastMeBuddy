@@ -4,11 +4,10 @@ import { scrapeUrl } from "@/lib/scraper";
 import { parseFile } from "@/lib/fileParser";
 import {
   runMegaBatch,
-  generateAiroast,
   RoastContext,
   RoastLevel,
   FullRoastResult,
-} from "@/lib/cerebras";
+} from "@/lib/opencode";
 
 function generateId(length = 12): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -226,21 +225,18 @@ export async function GET(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
   // 1. Get the roast from cache or database
-  let cachedEntry = resultCache.get(id);
+  const cachedEntry = resultCache.get(id);
   let roastData: FullRoastResult | null = null;
-  let mode = "product";
   let inputUrl: string | undefined = undefined;
 
   if (cachedEntry && Date.now() - cachedEntry.createdAt < CACHE_TTL_MS) {
     roastData = cachedEntry.result as FullRoastResult;
-    mode = roastData.mode || mode;
     // Refresh TTL on access so shared links stay alive longer
     resultCache.set(id, { result: roastData, createdAt: Date.now() });
   } else {
     const dbRoast = await getRoastById(id);
     if (dbRoast) {
       roastData = dbRoast.result as FullRoastResult;
-      mode = dbRoast.mode;
       inputUrl = dbRoast.inputUrl || undefined;
     }
   }
@@ -249,12 +245,13 @@ export async function GET(req: NextRequest) {
 
   // 2. If client is requesting lazy AI Roast text narrative
   if (type === "narrative") {
-    if (roastData.aiRoast) {
+    // Serve cached narrative, but if it was a failed fallback ("unavailable"), retry generation
+    if (roastData.aiRoast && !roastData.aiRoast.includes("unavailable")) {
       return NextResponse.json({ aiRoast: roastData.aiRoast });
     }
 
     try {
-      const { generateAiroast } = await import("@/lib/cerebras");
+      const { generateAiroast } = await import("@/lib/opencode");
       const ctx: RoastContext = {
         mode: roastData.mode || (roastData.portfolio ? "portfolio" : "product"),
         roastLevel: roastData.roastLevel,
@@ -264,14 +261,18 @@ export async function GET(req: NextRequest) {
       };
 
       const generatedRoast = await generateAiroast(ctx);
-      
-      // Update data structure
+
       roastData.aiRoast = generatedRoast;
 
-      // Save back to in-memory cache
-      resultCache.set(id, { result: roastData, createdAt: Date.now() });
-      
-      // Save back to PostgreSQL database
+      // Only cache successful results for reuse; failed fallbacks stay retryable
+      if (!generatedRoast.includes("unavailable")) {
+        resultCache.set(id, { result: roastData, createdAt: Date.now() });
+      } else {
+        // Clear stale empty aiRoast so next retry regenerates
+        roastData.aiRoast = "";
+        resultCache.set(id, { result: roastData, createdAt: Date.now() });
+      }
+
       updateRoastInDb(id, roastData);
 
       return NextResponse.json({ aiRoast: generatedRoast });

@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import html2canvas from "html2canvas";
-import type { FullRoastResult, AuditResult, UXResult, PersonaResult, SharkTankResult, FuneralResult, ActionPlanResult, PortfolioResult } from "@/lib/cerebras";
+import type { FullRoastResult, AuditResult, UXResult, PersonaResult, SharkTankResult, FuneralResult, ActionPlanResult, PortfolioResult } from "@/lib/opencode";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function ScoreBar({ label, value, color = "#FF4500" }: { label: string; value: number; color?: string }) {
