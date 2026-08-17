@@ -348,6 +348,10 @@ async function callCerebras(
         headers: {
           "Authorization": `Bearer ${key}`,
           "Content-Type": "application/json",
+          // REQUIRED for free-tier Zen models (deepseek-v4-flash-free): the
+          // upstream provider gates free capacity on the `opencode/` User-Agent.
+          // Without it, every request is rejected with 429 FreeUsageLimitError.
+          "User-Agent": "opencode/1.18.16",
         },
         body: JSON.stringify({
           model: MODEL,
