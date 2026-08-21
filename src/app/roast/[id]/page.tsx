@@ -1,40 +1,48 @@
 "use client";
+
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import html2canvas from "html2canvas";
 import type { FullRoastResult, AuditResult, UXResult, PersonaResult, SharkTankResult, FuneralResult, ActionPlanResult, PortfolioResult } from "@/lib/opencode";
+import { TiltCard } from "@/components/TiltCard";
+import { AmbientBackground } from "@/components/AmbientBackground";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function ScoreBar({ label, value, color = "#FF4500" }: { label: string; value: number; color?: string }) {
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs font-mono">
-        <span className="text-[#71717A]" style={{ color: "#71717A" }}>{label}</span>
-        <span style={{ color }}>{value}/100</span>
+        <span className="text-[#9CA3AF]">{label}</span>
+        <span style={{ color }} className="font-bold">{value}/100</span>
       </div>
-      <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${value}%`, background: color }} />
+      <div className="h-2 rounded-full bg-white/5 overflow-hidden border border-white/5">
+        <div
+          className="h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_currentColor]"
+          style={{ width: `${value}%`, background: color }}
+        />
       </div>
     </div>
   );
 }
 
-function ScoreRing({ score, size = 120, color = "#FF4500" }: { score: number; size?: number; color?: string }) {
-  const r = 45;
+function ScoreRing({ score, size = 130, color = "#FF4500" }: { score: number; size?: number; color?: string }) {
+  const r = 44;
   const circ = 2 * Math.PI * r;
   const offset = circ - (score / 100) * circ;
   return (
     <div className="relative flex items-center justify-center flex-shrink-0" style={{ width: size, height: size }}>
       <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
         <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
-        <circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="8"
+        <circle
+          cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="8"
           strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 0 8px ${color}88)`, transition: "stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)" }} />
+          style={{ filter: `drop-shadow(0 0 12px ${color}aa)`, transition: "stroke-dashoffset 1.2s cubic-bezier(0.16,1,0.3,1)" }}
+        />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-2xl font-bold">{score}</span>
-        <span className="text-[10px] text-[#71717A] font-mono" style={{ color: "#71717A" }}>/ 100</span>
+        <span style={{ fontFamily: "Space Grotesk, sans-serif" }} className="text-3xl font-extrabold text-white">{score}</span>
+        <span className="text-[10px] text-[#9CA3AF] font-mono tracking-widest uppercase">/ 100</span>
       </div>
     </div>
   );
@@ -42,34 +50,30 @@ function ScoreRing({ score, size = 120, color = "#FF4500" }: { score: number; si
 
 function Tag({ type, label }: { type: "critical" | "warning" | "good" | "info"; label: string }) {
   const styles = {
-    critical: "bg-red-500/10 text-red-400 border-red-500/20",
-    warning:  "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-    good:     "bg-green-500/10 text-green-400 border-green-500/20",
-    info:     "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  };
-  const clr = {
-    critical: "#F87171",
-    warning:  "#FBBF24",
-    good:     "#34D399",
-    info:     "#60A5FA",
+    critical: "bg-red-500/10 text-red-400 border-red-500/30",
+    warning:  "bg-amber-500/10 text-amber-400 border-amber-500/30",
+    good:     "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+    info:     "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
   };
   const icons = { critical: "🔴", warning: "🟡", good: "🟢", info: "🔵" };
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-mono ${styles[type]}`} style={{ color: clr[type], borderColor: `${clr[type]}25`, background: `${clr[type]}08` }}>
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-mono font-medium ${styles[type]}`}>
       {icons[type]} {label}
     </span>
   );
 }
 
 function IssueRow({ text, type }: { text: string; type: "critical" | "warning" | "good" }) {
-  const clr = { critical: "#EF4444", warning: "#F59E0B", good: "#22C55E" };
+  const clr = { critical: "#EF4444", warning: "#F59E0B", good: "#10B981" };
   return (
-    <div className={`flex gap-3 items-start p-4 rounded-xl border`}
-      style={{ background: `${clr[type]}08`, borderColor: `${clr[type]}25` }}>
-      <span className="flex-shrink-0 mt-0.5">
+    <div
+      className="flex gap-3.5 items-start p-4 rounded-xl border backdrop-blur-md transition-all hover:translate-x-1 duration-200"
+      style={{ background: `${clr[type]}0a`, borderColor: `${clr[type]}30` }}
+    >
+      <span className="flex-shrink-0 mt-0.5 text-base">
         {type === "critical" ? "🔴" : type === "warning" ? "🟡" : "🟢"}
       </span>
-      <p className="text-sm text-[#F1F1F3] leading-relaxed" style={{ color: "#F1F1F3" }}>{text}</p>
+      <p className="text-sm text-[#F3F4F6] leading-relaxed font-normal">{text}</p>
     </div>
   );
 }
@@ -78,57 +82,69 @@ function IssueRow({ text, type }: { text: string; type: "critical" | "warning" |
 function RoastPanel({ text, loading, onRetry }: { text: string; loading: boolean; onRetry?: () => void }) {
   return (
     <div className="space-y-6 fade-in-up">
-      <div className="glass rounded-2xl p-8 border border-white/[0.06] relative overflow-hidden">
-        <div className="absolute -top-24 -right-24 w-48 h-48 rounded-full blur-3xl opacity-10" style={{ background: "#EF4444" }} />
-        <div className="absolute -bottom-24 -left-24 w-48 h-48 rounded-full blur-3xl opacity-10" style={{ background: "#F97316" }} />
+      <TiltCard maxTilt={3} scale={1.01} className="glass-specular rounded-3xl p-8 sm:p-10 border border-white/15 relative overflow-hidden shadow-[0_20px_70px_rgba(0,0,0,0.8)]">
+        <div className="absolute -top-32 -right-32 w-64 h-64 rounded-full blur-3xl opacity-20 bg-[#EF4444]" />
+        <div className="absolute -bottom-32 -left-32 w-64 h-64 rounded-full blur-3xl opacity-15 bg-[#F97316]" />
+        
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-6">
-            <span className="text-4xl">{loading ? "⏳" : "🎤"}</span>
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/30 flex items-center justify-center shadow-[0_0_25px_rgba(239,68,68,0.3)]">
+              <span className="text-3xl">{loading ? "⏳" : "🎤"}</span>
+            </div>
             <div>
-              <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-2xl font-bold">
-                {loading ? "Generating the Roast..." : "The Roast"}
+              <h3 style={{ fontFamily: "Space Grotesk, sans-serif" }} className="text-2xl sm:text-3xl font-extrabold text-white">
+                {loading ? "Crafting Your Roast…" : "The Comedy Roast"}
               </h3>
-              <p className="text-xs text-[#71717A] font-mono" style={{ color: "#71717A" }}>
-                {loading ? "AI is crafting pure verbal destruction, please wait..." : "Professional comedy roast — no filters, no mercy"}
+              <p className="text-xs text-[#9CA3AF] font-mono tracking-wider uppercase mt-0.5">
+                {loading ? "AI is generating savage feedback, please wait…" : "Unfiltered truth · Zero mercy · Full teardown"}
               </p>
             </div>
           </div>
+
           {loading ? (
-            <div className="space-y-4">
-              <div className="h-4 bg-white/5 rounded w-full animate-pulse" />
-              <div className="h-4 bg-white/5 rounded w-5/6 animate-pulse" />
-              <div className="h-4 bg-white/5 rounded w-4/5 animate-pulse" />
-              <div className="h-4 bg-white/5 rounded w-full animate-pulse" />
-              <div className="h-4 bg-white/5 rounded w-3/4 animate-pulse" />
+            <div className="space-y-4 py-4">
+              <div className="h-5 bg-white/5 rounded-lg w-full animate-pulse" />
+              <div className="h-5 bg-white/5 rounded-lg w-5/6 animate-pulse" />
+              <div className="h-5 bg-white/5 rounded-lg w-4/5 animate-pulse" />
+              <div className="h-5 bg-white/5 rounded-lg w-full animate-pulse" />
+              <div className="h-5 bg-white/5 rounded-lg w-3/4 animate-pulse" />
             </div>
           ) : text.includes("unavailable") ? (
-            <div className="text-center space-y-4">
-              <p className="text-[#71717A] font-mono text-sm">{text}</p>
+            <div className="text-center space-y-4 py-6">
+              <p className="text-[#9CA3AF] font-mono text-sm">{text}</p>
               {onRetry && (
-                <button onClick={onRetry} className="btn-primary px-5 py-2 rounded-full text-sm">
+                <button onClick={onRetry} className="btn-primary px-6 py-2.5 rounded-full text-sm font-bold shadow-[0_0_25px_rgba(255,69,0,0.4)]">
                   🔄 Retry Roast
                 </button>
               )}
             </div>
           ) : (
-            <div className="prose prose-invert max-w-none">
-              {(text || "The product is so boring even the AI fell asleep.").split("\n").filter(Boolean).map((paragraph, i, arr) => (
-                <p key={i} className="text-base md:text-lg leading-relaxed text-[#F1F1F3] mb-4 last:mb-0" style={{ color: "#F1F1F3", fontFamily: "Georgia, serif", fontStyle: i === arr.length - 1 ? "italic" : "normal" }}>
+            <div className="prose prose-invert max-w-none space-y-5">
+              {(text || "The resume was so generic even the AI fell asleep.").split("\n").filter(Boolean).map((paragraph, i, arr) => (
+                <p
+                  key={i}
+                  className="text-base sm:text-lg leading-relaxed text-[#F3F4F6] p-4 rounded-xl bg-white/[0.02] border border-white/[0.04]"
+                  style={{
+                    fontFamily: "Georgia, serif",
+                    fontStyle: i === arr.length - 1 ? "italic" : "normal",
+                    borderColor: i === arr.length - 1 ? "rgba(255, 69, 0, 0.25)" : "rgba(255, 255, 255, 0.04)",
+                  }}
+                >
                   {paragraph}
                 </p>
               ))}
             </div>
           )}
         </div>
-      </div>
+      </TiltCard>
     </div>
   );
 }
 
 function EmptySection({ message }: { message: string }) {
   return (
-    <div className="glass rounded-xl p-6 border border-white/[0.06] text-center">
-      <p className="text-sm text-[#71717A] font-mono">{message}</p>
+    <div className="glass rounded-2xl p-8 border border-white/10 text-center">
+      <p className="text-sm text-[#9CA3AF] font-mono">{message}</p>
     </div>
   );
 }
@@ -137,59 +153,59 @@ function UXPanel({ data, mode }: { data: UXResult; mode: "product" | "portfolio"
   const isPortfolio = mode === "portfolio";
   const subLabels = isPortfolio
     ? [
-        { label: "Section Layout & ATS", color: "#FF4500" },
-        { label: "Contact Links Visibility", color: "#8B5CF6" },
-        { label: "Credentials & Links", color: "#F97316" },
+        { label: "Section Structure & ATS", color: "#FF4500" },
+        { label: "Contact Info & Links", color: "#8B5CF6" },
+        { label: "Credentials & Endorsements", color: "#00F2FF" },
       ]
     : [
         { label: "Visual Hierarchy", color: "#FF4500" },
         { label: "CTA Placement", color: "#8B5CF6" },
-        { label: "Trust Signals", color: "#F97316" },
+        { label: "Trust Signals", color: "#00F2FF" },
       ];
   const scores = [data.visualHierarchy, data.ctaPlacement, data.trustSignals];
 
   return (
     <div className="space-y-6 fade-in-up">
-      <div className="glass rounded-2xl p-6 border border-white/[0.06] flex flex-col md:flex-row gap-6 items-start">
-        <ScoreRing score={data.score} size={130} color="#8B5CF6" />
-        <div className="flex-1 space-y-4">
-          <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-xl font-bold">
-            {isPortfolio ? "CV Readability Audit" : "UX + Conversion Audit"}
+      <TiltCard maxTilt={4} scale={1.01} className="glass-specular rounded-3xl p-8 border border-white/15 flex flex-col md:flex-row gap-8 items-center md:items-start shadow-[0_20px_60px_rgba(0,0,0,0.7)]">
+        <ScoreRing score={data.score} size={135} color="#8B5CF6" />
+        <div className="flex-1 space-y-4 w-full">
+          <h3 style={{ fontFamily: "Space Grotesk, sans-serif" }} className="text-2xl font-extrabold text-white">
+            {isPortfolio ? "CV Layout & Scanability" : "UX + Conversion Audit"}
           </h3>
-          <p className="text-[#71717A] text-sm leading-relaxed">
+          <p className="text-[#9CA3AF] text-sm leading-relaxed">
             {isPortfolio
-              ? "How scannable, ATS-friendly, and recruiter-ready your CV layout is."
-              : "How users experience your page — hierarchy, CTAs, and trust."}
+              ? "How recruiter-friendly, scannable, and ATS-compatible your formatting is."
+              : "How users navigate your page — hierarchy, CTAs, and trust signals."}
           </p>
-          <div className="space-y-3">
+          <div className="space-y-3 pt-1">
             {subLabels.map((l, i) => (
               <ScoreBar key={l.label} label={l.label} value={scores[i]} color={l.color} />
             ))}
           </div>
         </div>
-      </div>
+      </TiltCard>
 
       {data.criticalIssues.length > 0 && (
         <div className="space-y-3">
-          <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider">🔴 Critical Issues</h4>
+          <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider font-bold">🔴 Critical Issues</h4>
           {data.criticalIssues.map((issue, i) => <IssueRow key={i} text={issue} type="critical" />)}
         </div>
       )}
 
       {data.warnings.length > 0 && (
         <div className="space-y-3">
-          <h4 className="text-xs font-mono text-yellow-400 uppercase tracking-wider">🟡 Warnings</h4>
+          <h4 className="text-xs font-mono text-amber-400 uppercase tracking-wider font-bold">🟡 Warnings</h4>
           {data.warnings.map((w, i) => <IssueRow key={i} text={w} type="warning" />)}
         </div>
       )}
 
       {data.frictionPoints.length > 0 && (
         <div className="space-y-3">
-          <h4 className="text-xs font-mono text-[#71717A] uppercase tracking-wider">⚡ Friction Points</h4>
+          <h4 className="text-xs font-mono text-[#9CA3AF] uppercase tracking-wider font-bold">⚡ Friction Points</h4>
           {data.frictionPoints.map((f, i) => (
-            <div key={i} className="flex gap-3 items-start glass rounded-xl p-4 border border-white/[0.06]">
+            <div key={i} className="flex gap-3.5 items-start glass rounded-xl p-4 border border-white/10">
               <span className="text-[#F97316] flex-shrink-0">→</span>
-              <p className="text-sm text-[#F1F1F3]">{f}</p>
+              <p className="text-sm text-[#F3F4F6]">{f}</p>
             </div>
           ))}
         </div>
@@ -197,14 +213,14 @@ function UXPanel({ data, mode }: { data: UXResult; mode: "product" | "portfolio"
 
       {data.quickWins.length > 0 && (
         <div className="space-y-3">
-          <h4 className="text-xs font-mono text-green-400 uppercase tracking-wider">🟢 Quick Wins</h4>
+          <h4 className="text-xs font-mono text-emerald-400 uppercase tracking-wider font-bold">🟢 Quick Wins</h4>
           {data.quickWins.map((q, i) => <IssueRow key={i} text={q} type="good" />)}
         </div>
       )}
 
       {data.criticalIssues.length === 0 && data.warnings.length === 0 &&
        data.frictionPoints.length === 0 && data.quickWins.length === 0 && (
-        <EmptySection message="No specific UX issues flagged — scores above tell the story." />
+        <EmptySection message="No critical format issues flagged — scores above reflect overall quality." />
       )}
     </div>
   );
@@ -217,83 +233,107 @@ function AuditPanel({ data, mode }: { data: AuditResult; mode: "product" | "port
         { label: "Achievement Clarity", color: "#FF4500" },
         { label: "Unique Value", color: "#8B5CF6" },
         { label: "Differentiation", color: "#F97316" },
-        { label: "Role Fit", color: "#22C55E" },
+        { label: "Target Role Fit", color: "#10B981" },
       ]
     : [
         { label: "Problem Clarity", color: "#FF4500" },
         { label: "Value Proposition", color: "#8B5CF6" },
         { label: "Differentiation", color: "#F97316" },
-        { label: "Positioning", color: "#22C55E" },
+        { label: "Market Positioning", color: "#10B981" },
       ];
 
   const scores = [data.problemClarity, data.valueProp, data.differentiation, data.positioning];
 
   return (
     <div className="space-y-6 fade-in-up">
-      <div className="glass rounded-2xl p-6 border border-white/[0.06] flex flex-col md:flex-row gap-6 items-start">
-        <ScoreRing score={data.overallScore} size={130} />
-        <div className="flex-1 space-y-4">
-          <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-xl font-bold">{isPortfolio ? "CV Audit" : "Overall Audit"}</h3>
-          <p className="text-[#71717A] text-sm leading-relaxed" style={{ color: "#71717A" }}>{data.summary}</p>
-          <div className="space-y-3">
+      <TiltCard maxTilt={4} scale={1.01} className="glass-specular rounded-3xl p-8 border border-white/15 flex flex-col md:flex-row gap-8 items-center md:items-start shadow-[0_20px_60px_rgba(0,0,0,0.7)]">
+        <ScoreRing score={data.overallScore} size={135} />
+        <div className="flex-1 space-y-4 w-full">
+          <h3 style={{ fontFamily: "Space Grotesk, sans-serif" }} className="text-2xl font-extrabold text-white">
+            {isPortfolio ? "Candidate Hireability Audit" : "Overall Product Audit"}
+          </h3>
+          <p className="text-[#9CA3AF] text-sm leading-relaxed">{data.summary}</p>
+          <div className="space-y-3 pt-1">
             {subLabels.map((l, i) => (
               <ScoreBar key={l.label} label={l.label} value={scores[i]} color={l.color} />
             ))}
           </div>
         </div>
-      </div>
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="glass rounded-2xl p-5 border border-white/[0.06]">
-          <h4 className="text-xs font-mono text-green-400 uppercase tracking-wider mb-4" style={{ color: "#4ADE80" }}>✅ Strengths</h4>
-          <ul className="space-y-2">
+      </TiltCard>
+
+      <div className="grid md:grid-cols-2 gap-5">
+        <TiltCard maxTilt={3} scale={1.01} className="glass rounded-2xl p-6 border border-emerald-500/20">
+          <h4 className="text-xs font-mono text-emerald-400 uppercase tracking-wider mb-4 font-bold flex items-center gap-1.5">
+            <span>✅</span> Strengths Detected
+          </h4>
+          <ul className="space-y-3">
             {data.strengths.map((s, i) => (
-              <li key={i} className="flex gap-2 text-sm text-[#F1F1F3]" style={{ color: "#F1F1F3" }}><span className="text-green-400 flex-shrink-0" style={{ color: "#4ADE80" }}>→</span>{s}</li>
+              <li key={i} className="flex gap-2.5 text-sm text-[#F3F4F6]">
+                <span className="text-emerald-400 flex-shrink-0">→</span>
+                <span>{s}</span>
+              </li>
             ))}
           </ul>
-        </div>
-        <div className="glass rounded-2xl p-5 border border-white/[0.06]">
-          <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider mb-4" style={{ color: "#F87171" }}>❌ Weaknesses</h4>
-          <ul className="space-y-2">
+        </TiltCard>
+
+        <TiltCard maxTilt={3} scale={1.01} className="glass rounded-2xl p-6 border border-red-500/20">
+          <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider mb-4 font-bold flex items-center gap-1.5">
+            <span>❌</span> Flaws & Weak Points
+          </h4>
+          <ul className="space-y-3">
             {data.weaknesses.map((w, i) => (
-              <li key={i} className="flex gap-2 text-sm text-[#F1F1F3]" style={{ color: "#F1F1F3" }}><span className="text-red-400 flex-shrink-0" style={{ color: "#F87171" }}>→</span>{w}</li>
+              <li key={i} className="flex gap-2.5 text-sm text-[#F3F4F6]">
+                <span className="text-red-400 flex-shrink-0">→</span>
+                <span>{w}</span>
+              </li>
             ))}
           </ul>
-        </div>
+        </TiltCard>
       </div>
     </div>
   );
 }
 
-
 function PersonasPanel({ data }: { data: PersonaResult[] }) {
   return (
     <div className="space-y-5 fade-in-up">
       {data.map((p, i) => (
-        <div key={i} className="glass rounded-2xl p-6 border border-white/[0.06] transition-all hover:border-white/10">
+        <TiltCard
+          key={i}
+          maxTilt={4}
+          scale={1.01}
+          className="glass-specular rounded-2xl p-6 border border-white/10 transition-all hover:border-white/25 shadow-[0_10px_35px_rgba(0,0,0,0.5)]"
+        >
           <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">{p.emoji}</span>
+            <div className="flex items-center gap-3.5">
+              <span className="text-3xl p-2 rounded-xl bg-white/5 border border-white/10">{p.emoji}</span>
               <div>
-                <h3 style={{ fontFamily: "Syne, sans-serif", color: p.color }} className="font-bold">{p.persona}</h3>
+                <h3 style={{ fontFamily: "Space Grotesk, sans-serif", color: p.color }} className="text-xl font-bold">
+                  {p.persona}
+                </h3>
+                <span className="text-[11px] font-mono text-[#9CA3AF] uppercase">Simulated Recruiter Review</span>
               </div>
             </div>
             <ScoreRing score={p.score} size={64} color={p.color} />
           </div>
+
           <div className="space-y-3">
-            <div className="glass rounded-xl p-4 border border-white/[0.04]">
-              <span className="text-xs font-mono text-[#71717A] uppercase tracking-wider block mb-1" style={{ color: "#71717A" }}>First Impression</span>
-              <p className="text-sm text-[#F1F1F3]" style={{ color: "#F1F1F3" }}>{p.firstImpression}</p>
+            <div className="glass rounded-xl p-4 border border-white/5">
+              <span className="text-xs font-mono text-[#9CA3AF] uppercase tracking-wider block mb-1">First Impression</span>
+              <p className="text-sm text-[#F3F4F6]">{p.firstImpression}</p>
             </div>
-            <div className="glass rounded-xl p-4 border border-white/[0.04]" style={{ borderColor: `${p.color}20` }}>
-              <span className="text-xs font-mono uppercase tracking-wider block mb-1" style={{ color: p.color }}>Main Objection</span>
-              <p className="text-sm text-[#F1F1F3]" style={{ color: "#F1F1F3" }}>{p.mainObjection}</p>
+            <div className="glass rounded-xl p-4 border border-white/5" style={{ borderColor: `${p.color}30` }}>
+              <span className="text-xs font-mono uppercase tracking-wider block mb-1 font-bold" style={{ color: p.color }}>
+                Main Objection
+              </span>
+              <p className="text-sm text-[#F3F4F6]">{p.mainObjection}</p>
             </div>
             <div className="flex items-center gap-2 pt-1">
-              <span className="text-xs font-mono text-[#71717A]" style={{ color: "#71717A" }}>Verdict:</span>
-              <span className="text-sm text-[#F1F1F3] italic" style={{ color: "#F1F1F3" }}>&ldquo;{p.verdict}&rdquo;</span>
+              <span className="text-xs font-mono text-[#9CA3AF]">Verdict:</span>
+              <span className="text-sm text-[#F3F4F6] italic">&ldquo;{p.verdict}&rdquo;</span>
             </div>
           </div>
-        </div>
+        </TiltCard>
       ))}
     </div>
   );
@@ -302,35 +342,34 @@ function PersonasPanel({ data }: { data: PersonaResult[] }) {
 function SharkTankPanel({ data }: { data: SharkTankResult }) {
   return (
     <div className="space-y-6 fade-in-up">
-      {/* Verdict */}
-      <div className="glass rounded-2xl p-6 border border-red-500/20 text-center">
+      <TiltCard maxTilt={3} scale={1.01} className="glass-specular rounded-3xl p-8 border border-red-500/30 text-center shadow-[0_20px_60px_rgba(0,0,0,0.8)]">
         <span className="text-4xl block mb-3">🦈</span>
-        <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-2xl font-bold mb-2">Funding Verdict</h3>
-        <p className="text-xl text-red-400 font-semibold italic" style={{ color: "#F87171" }}>&ldquo;{data.fundingVerdict}&rdquo;</p>
-        <div className="mt-4">
+        <h3 style={{ fontFamily: "Space Grotesk, sans-serif" }} className="text-2xl font-bold text-white mb-2">Funding Verdict</h3>
+        <p className="text-xl text-red-400 font-semibold italic">&ldquo;{data.fundingVerdict}&rdquo;</p>
+        <div className="mt-5 max-w-md mx-auto">
           <ScoreBar label="Funding Readiness" value={data.fundingReadiness} color="#EF4444" />
         </div>
-      </div>
-      {/* Questions */}
+      </TiltCard>
+
       <div className="space-y-3">
-        <h4 className="text-xs font-mono text-[#71717A] uppercase tracking-wider" style={{ color: "#71717A" }}>💣 Tough Questions You&apos;ll Face</h4>
+        <h4 className="text-xs font-mono text-[#9CA3AF] uppercase tracking-wider font-bold">💣 Tough Investor Questions</h4>
         {data.questions.map((q, i) => (
-          <div key={i} className="glass rounded-xl p-5 border border-white/[0.06]">
-            <p className="text-white font-semibold mb-2" style={{ color: "#FFFFFF" }}>&ldquo;{q.question}&rdquo;</p>
-            <p className="text-xs text-[#71717A] font-mono" style={{ color: "#71717A" }}><span className="text-[#F97316]" style={{ color: "#F97316" }}>↳ Why they ask: </span>{q.concern}</p>
+          <div key={i} className="glass rounded-2xl p-5 border border-white/10">
+            <p className="text-white font-semibold mb-2">&ldquo;{q.question}&rdquo;</p>
+            <p className="text-xs text-[#9CA3AF] font-mono"><span className="text-[#F97316]">↳ Why they ask: </span>{q.concern}</p>
           </div>
         ))}
       </div>
-      {/* Market + Moat */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="glass rounded-2xl p-5 border border-white/[0.06]">
-          <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider mb-3" style={{ color: "#F87171" }}>⚠️ Market Risk</h4>
-          <p className="text-sm text-[#F1F1F3] leading-relaxed" style={{ color: "#F1F1F3" }}>{data.marketRisk}</p>
+
+      <div className="grid md:grid-cols-2 gap-5">
+        <div className="glass rounded-2xl p-6 border border-white/10">
+          <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider mb-3 font-bold">⚠️ Market Risk</h4>
+          <p className="text-sm text-[#F3F4F6] leading-relaxed">{data.marketRisk}</p>
         </div>
-        <div className="glass rounded-2xl p-5 border border-white/[0.06]">
-          <h4 className="text-xs font-mono text-purple-400 uppercase tracking-wider mb-3" style={{ color: "#C084FC" }}>🏰 Moat Analysis</h4>
-          <p className="text-sm text-[#F1F1F3] leading-relaxed" style={{ color: "#F1F1F3" }}>{data.moatAnalysis}</p>
-          <div className="mt-3">
+        <div className="glass rounded-2xl p-6 border border-white/10">
+          <h4 className="text-xs font-mono text-purple-400 uppercase tracking-wider mb-3 font-bold">🏰 Moat Analysis</h4>
+          <p className="text-sm text-[#F3F4F6] leading-relaxed">{data.moatAnalysis}</p>
+          <div className="mt-4">
             <ScoreBar label="Moat Score" value={data.moatScore} color="#8B5CF6" />
           </div>
         </div>
@@ -341,39 +380,38 @@ function SharkTankPanel({ data }: { data: SharkTankResult }) {
 
 function FuneralPanel({ data }: { data: FuneralResult }) {
   return (
-    <div className="space-y-5 fade-in-up">
-      {/* Tombstone header */}
-      <div className="glass rounded-2xl p-8 border border-white/[0.06] text-center bg-gradient-to-b from-[#1C1C26]/80 to-transparent">
-        <span className="text-5xl block mb-4">⚰️</span>
-        <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-2xl font-bold mb-2">Product Funeral™</h3>
-        <div className="inline-block border border-white/10 rounded-xl px-6 py-3 mt-2" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-          <p className="text-[#71717A] text-xs font-mono" style={{ color: "#71717A" }}>DIED</p>
-          <p className="text-white font-semibold" style={{ color: "#FFFFFF" }}>{data.timeOfDeath}</p>
+    <div className="space-y-6 fade-in-up">
+      <TiltCard maxTilt={3} scale={1.01} className="glass-specular rounded-3xl p-8 border border-white/10 text-center relative overflow-hidden">
+        <span className="text-5xl block mb-4 animate-bounce">⚰️</span>
+        <h3 style={{ fontFamily: "Space Grotesk, sans-serif" }} className="text-2xl font-bold text-white mb-2">Product Funeral™</h3>
+        <div className="inline-block border border-white/10 rounded-xl px-6 py-2.5 my-3 bg-black/40">
+          <p className="text-[#9CA3AF] text-xs font-mono">TIME OF DEATH</p>
+          <p className="text-white font-semibold">{data.timeOfDeath}</p>
         </div>
-        <p className="mt-4 text-[#F97316] italic text-lg" style={{ color: "#F97316" }}>&ldquo;{data.epitaph}&rdquo;</p>
+        <p className="mt-3 text-[#F97316] italic text-lg">&ldquo;{data.epitaph}&rdquo;</p>
+      </TiltCard>
+
+      <div className="glass rounded-2xl p-6 border border-red-500/20">
+        <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider mb-3 font-bold">💀 Cause of Death</h4>
+        <p className="text-sm text-[#F3F4F6] leading-relaxed">{data.causeOfDeath}</p>
       </div>
-      {/* Cause */}
-      <div className="glass rounded-2xl p-5 border border-red-500/20">
-        <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider mb-3" style={{ color: "#F87171" }}>💀 Cause of Death</h4>
-        <p className="text-sm text-[#F1F1F3] leading-relaxed" style={{ color: "#F1F1F3" }}>{data.causeOfDeath}</p>
+
+      <div className="glass rounded-2xl p-6 border border-white/10">
+        <ScoreBar label="Survival Chance (if nothing changes)" value={data.survivalChance} color={data.survivalChance < 30 ? "#EF4444" : data.survivalChance < 60 ? "#F59E0B" : "#10B981"} />
       </div>
-      {/* Survival */}
-      <div className="glass rounded-2xl p-5 border border-white/[0.06]">
-        <ScoreBar label="Survival Chance (if nothing changes)" value={data.survivalChance} color={data.survivalChance < 30 ? "#EF4444" : data.survivalChance < 60 ? "#F59E0B" : "#22C55E"} />
-      </div>
-      {/* Missed signals */}
+
       <div className="space-y-3">
-        <h4 className="text-xs font-mono text-[#71717A] uppercase tracking-wider" style={{ color: "#71717A" }}>📡 Missed Signals</h4>
+        <h4 className="text-xs font-mono text-[#9CA3AF] uppercase tracking-wider font-bold">📡 Missed Warning Signals</h4>
         {data.missedSignals.map((s, i) => (
-          <div key={i} className="flex gap-3 items-start glass rounded-xl p-4 border border-white/[0.06]">
-            <span className="text-red-400 flex-shrink-0 font-mono text-sm" style={{ color: "#F87171" }}>0{i + 1}</span>
-            <p className="text-sm text-[#F1F1F3]" style={{ color: "#F1F1F3" }}>{s}</p>
+          <div key={i} className="flex gap-3.5 items-start glass rounded-xl p-4 border border-white/10">
+            <span className="text-red-400 flex-shrink-0 font-mono text-sm font-bold">0{i + 1}</span>
+            <p className="text-sm text-[#F3F4F6]">{s}</p>
           </div>
         ))}
       </div>
-      {/* Prevention */}
+
       <div className="space-y-3">
-        <h4 className="text-xs font-mono text-green-400 uppercase tracking-wider" style={{ color: "#4ADE80" }}>🛡️ Prevention Plan (Do This Now)</h4>
+        <h4 className="text-xs font-mono text-emerald-400 uppercase tracking-wider font-bold">🛡️ Prevention Plan</h4>
         {data.preventionPlan.map((p, i) => (
           <IssueRow key={i} text={p} type="good" />
         ))}
@@ -384,22 +422,23 @@ function FuneralPanel({ data }: { data: FuneralResult }) {
 
 function ActionPlanPanel({ data }: { data: ActionPlanResult }) {
   const cols = [
-    { key: "thisWeek" as const, label: "This Week", color: "#FF4500", bg: "rgba(255,69,0,0.07)", icon: "⚡" },
-    { key: "thisSprint" as const, label: "This Sprint", color: "#8B5CF6", bg: "rgba(139,92,246,0.07)", icon: "🏃" },
-    { key: "thisQuarter" as const, label: "This Quarter", color: "#F97316", bg: "rgba(249,115,22,0.07)", icon: "🎯" },
+    { key: "thisWeek" as const, label: "This Week (Quick Wins)", color: "#FF4500", icon: "⚡" },
+    { key: "thisSprint" as const, label: "This Sprint (Major Fixes)", color: "#8B5CF6", icon: "🏃" },
+    { key: "thisQuarter" as const, label: "This Quarter (Career Growth)", color: "#00F2FF", icon: "🎯" },
   ];
   return (
     <div className="fade-in-up">
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-3 gap-5">
         {cols.map((col) => (
-          <div key={col.key} className="glass rounded-2xl p-5 border border-white/[0.06]" style={{ background: col.bg }}>
-            <h4 style={{ fontFamily: "Syne, sans-serif", color: col.color }} className="font-bold mb-4 flex items-center gap-2">
-              <span>{col.icon}</span>{col.label}
+          <TiltCard key={col.key} maxTilt={4} scale={1.01} className="glass rounded-2xl p-6 border border-white/10 flex flex-col">
+            <h4 style={{ fontFamily: "Space Grotesk, sans-serif", color: col.color }} className="font-bold mb-4 flex items-center gap-2 text-base">
+              <span>{col.icon}</span>
+              <span>{col.label}</span>
             </h4>
-            <div className="space-y-3">
-              {(data[col.key].length > 0 ? data[col.key] : [{ action: "No actions generated for this timeframe.", impact: "—", effort: "—" }]).map((item, i) => (
-                <div key={i} className="glass rounded-xl p-3.5 border border-white/[0.04]">
-                  <p className="text-sm text-[#F1F1F3] mb-2 leading-relaxed" style={{ color: "#F1F1F3" }}>{item.action}</p>
+            <div className="space-y-3 flex-1">
+              {(data[col.key].length > 0 ? data[col.key] : [{ action: "No actions required for this timeframe.", impact: "—", effort: "—" }]).map((item, i) => (
+                <div key={i} className="glass rounded-xl p-4 border border-white/5 space-y-2.5">
+                  <p className="text-sm text-[#F3F4F6] leading-relaxed">{item.action}</p>
                   <div className="flex gap-2">
                     <Tag type={item.impact === "High" ? "critical" : item.impact === "Medium" ? "warning" : "info"} label={`Impact: ${item.impact}`} />
                     <Tag type={item.effort === "Low" ? "good" : item.effort === "Medium" ? "warning" : "critical"} label={`Effort: ${item.effort}`} />
@@ -407,7 +446,7 @@ function ActionPlanPanel({ data }: { data: ActionPlanResult }) {
                 </div>
               ))}
             </div>
-          </div>
+          </TiltCard>
         ))}
       </div>
     </div>
@@ -417,31 +456,37 @@ function ActionPlanPanel({ data }: { data: ActionPlanResult }) {
 function PortfolioPanel({ data }: { data: PortfolioResult }) {
   return (
     <div className="space-y-6 fade-in-up">
-      <div className="glass rounded-2xl p-6 border border-white/[0.06] flex flex-col md:flex-row gap-6 items-start">
-        <ScoreRing score={data.overallScore} size={130} color="#8B5CF6" />
-        <div className="flex-1 space-y-3">
-          <h3 style={{ fontFamily: "Syne, sans-serif", color: "#FFFFFF" }} className="text-xl font-bold">Hiring Manager Mode™</h3>
-          <p className="text-[#71717A] text-sm leading-relaxed" style={{ color: "#71717A" }}>{data.summary}</p>
-          <ScoreBar label="First Impression" value={data.firstImpression} color="#FF4500" />
-          <ScoreBar label="Case Study Depth" value={data.caseStudyDepth} color="#8B5CF6" />
-          <ScoreBar label="Design Taste" value={data.designTaste} color="#F97316" />
-          <ScoreBar label="Skill vs. Effort Proof" value={data.skillProof} color="#22C55E" />
-          <ScoreBar label="Hiring CTA" value={data.ctaScore} color="#06B6D4" />
+      <TiltCard maxTilt={4} scale={1.01} className="glass-specular rounded-3xl p-8 border border-white/15 flex flex-col md:flex-row gap-8 items-center md:items-start shadow-[0_20px_60px_rgba(0,0,0,0.7)]">
+        <ScoreRing score={data.overallScore} size={135} color="#8B5CF6" />
+        <div className="flex-1 space-y-3.5 w-full">
+          <h3 style={{ fontFamily: "Space Grotesk, sans-serif" }} className="text-2xl font-extrabold text-white">
+            Hiring Manager Assessment
+          </h3>
+          <p className="text-[#9CA3AF] text-sm leading-relaxed">{data.summary}</p>
+          <div className="space-y-2.5 pt-1">
+            <ScoreBar label="First Impression" value={data.firstImpression} color="#FF4500" />
+            <ScoreBar label="Case Study / Project Depth" value={data.caseStudyDepth} color="#8B5CF6" />
+            <ScoreBar label="Design & Typography Taste" value={data.designTaste} color="#F97316" />
+            <ScoreBar label="Proof of Competence" value={data.skillProof} color="#10B981" />
+            <ScoreBar label="Contact & Hiring CTA" value={data.ctaScore} color="#00F2FF" />
+          </div>
         </div>
-      </div>
-      <div className="glass rounded-2xl p-5 border border-purple-500/20">
-        <h4 className="text-xs font-mono text-purple-400 uppercase tracking-wider mb-3" style={{ color: "#C084FC" }}>💼 Recruiter Verdict</h4>
-        <p className="text-[#F1F1F3] italic" style={{ color: "#F1F1F3" }}>&ldquo;{data.recruiterVerdict}&rdquo;</p>
-      </div>
+      </TiltCard>
+
+      <TiltCard maxTilt={3} scale={1.01} className="glass rounded-2xl p-6 border border-purple-500/30">
+        <h4 className="text-xs font-mono text-purple-400 uppercase tracking-wider mb-2 font-bold">💼 Recruiter Verdict</h4>
+        <p className="text-[#F3F4F6] italic text-base leading-relaxed">&ldquo;{data.recruiterVerdict}&rdquo;</p>
+      </TiltCard>
+
       <div className="space-y-3">
-        <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider" style={{ color: "#F87171" }}>Top Issues to Fix</h4>
+        <h4 className="text-xs font-mono text-red-400 uppercase tracking-wider font-bold">Top Priority Fixes</h4>
         {data.topIssues.map((issue, i) => <IssueRow key={i} text={issue} type="warning" />)}
       </div>
     </div>
   );
 }
 
-// ── Loading skeleton ────────────────────────────────────────────────────────
+// ── Loading Skeleton ────────────────────────────────────────────────────────
 function SkeletonBlock({ className = "" }: { className?: string }) {
   return <div className={`shimmer rounded-xl ${className}`} />;
 }
@@ -449,17 +494,15 @@ function SkeletonBlock({ className = "" }: { className?: string }) {
 function LoadingSkeleton() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6 fade-in-up">
-      {/* Tab skeleton */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto">
         {[...Array(6)].map((_, i) => (
-          <SkeletonBlock key={i} className="h-9 w-28 rounded-full" />
+          <SkeletonBlock key={i} className="h-10 w-28 rounded-full flex-shrink-0" />
         ))}
       </div>
-      {/* Main panel skeleton */}
-      <div className="glass rounded-2xl p-6 border border-white/[0.06] flex flex-col md:flex-row gap-6 items-start">
-        <SkeletonBlock className="w-[130px] h-[130px] rounded-full" />
-        <div className="flex-1 space-y-4">
-          <SkeletonBlock className="h-7 w-48" />
+      <div className="glass rounded-3xl p-8 border border-white/10 flex flex-col md:flex-row gap-8 items-start">
+        <SkeletonBlock className="w-[135px] h-[135px] rounded-full" />
+        <div className="flex-1 space-y-4 w-full">
+          <SkeletonBlock className="h-8 w-48" />
           <SkeletonBlock className="h-4 w-full" />
           <SkeletonBlock className="h-4 w-3/4" />
           <div className="space-y-3 pt-2">
@@ -472,34 +515,22 @@ function LoadingSkeleton() {
           </div>
         </div>
       </div>
-      {/* Two-column skeleton */}
-      <div className="grid md:grid-cols-2 gap-4">
-        {[...Array(2)].map((_, i) => (
-          <div key={i} className="glass rounded-2xl p-5 border border-white/[0.06] space-y-3">
-            <SkeletonBlock className="h-4 w-24" />
-            {[...Array(3)].map((_, j) => (
-              <SkeletonBlock key={j} className="h-4 w-full" />
-            ))}
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
 
-// ── TABS config ────────────────────────────────────────────────────────────
+// ── Tabs config ────────────────────────────────────────────────────────────
 const ALL_TABS = [
   { id: "audit",     label: "🎯 Audit",       color: "#FF4500", productOnly: false },
-  { id: "ux",        label: "👁️ UX",          color: "#8B5CF6", productOnly: false },
+  { id: "ux",        label: "👁️ Layout",      color: "#8B5CF6", productOnly: false },
   { id: "roast",     label: "🎤 Roast",       color: "#EF4444", productOnly: false },
   { id: "personas",  label: "🎭 Personas",    color: "#F97316", productOnly: false },
   { id: "sharktank", label: "🦈 Shark Tank",  color: "#EF4444", productOnly: true },
   { id: "funeral",   label: "⚰️ Funeral",     color: "#71717A", productOnly: true },
-  { id: "actions",   label: "✅ Action Plan", color: "#22C55E", productOnly: false },
-  { id: "portfolio", label: "💼 Portfolio",   color: "#06B6D4", productOnly: false },
+  { id: "actions",   label: "✅ Action Plan", color: "#10B981", productOnly: false },
+  { id: "portfolio", label: "💼 Portfolio",   color: "#00F2FF", productOnly: false },
 ];
 
-// ── MAIN PAGE ──────────────────────────────────────────────────────────────
 export default function RoastResultPage() {
   const params = useParams();
   const id = params?.id as string;
@@ -588,7 +619,7 @@ export default function RoastResultPage() {
 
   useEffect(() => {
     async function load() {
-      // 1. sessionStorage — full result from same browser session (includes scrapedText)
+      // 1. sessionStorage — full result from same browser session
       const cached = sessionStorage.getItem(`roast_${id}`);
       if (cached) {
         try {
@@ -598,7 +629,7 @@ export default function RoastResultPage() {
         } catch { /* fall through */ }
       }
 
-      // 2. URL hash — shared links (may omit scrapedText)
+      // 2. URL hash — shared links
       if (typeof window !== "undefined" && window.location.hash) {
         try {
           const hash = window.location.hash.slice(1);
@@ -607,9 +638,7 @@ export default function RoastResultPage() {
           sessionStorage.setItem(`roast_${id}`, JSON.stringify(decoded));
           setLoading(false);
           return;
-        } catch {
-          // hash decode failed, fall through
-        }
+        } catch { /* fall through */ }
       }
 
       // 3. Fallback: fetch from API
@@ -649,65 +678,20 @@ export default function RoastResultPage() {
     setDownloading(true);
     try {
       const canvas = await html2canvas(captureRef.current, {
-        backgroundColor: "#0A0A0F",
+        backgroundColor: "#06060A",
         scale: 2,
         useCORS: true,
         logging: false,
-        onclone: (clonedDoc, element) => {
-          // 1. Force main container styling (solid dark background + premium poster padding)
-          element.style.setProperty("background", "#0A0A0F", "important");
-          element.style.setProperty("background-color", "#0A0A0F", "important");
+        onclone: (_, element) => {
+          element.style.setProperty("background", "#06060A", "important");
           element.style.setProperty("padding", "32px", "important");
           element.style.setProperty("border-radius", "24px", "important");
 
-          // 2. Remove prose and prose-invert class overrides
-          const proseEls = element.querySelectorAll(".prose, .prose-invert");
-          proseEls.forEach((el: any) => {
-            el.classList.remove("prose", "prose-invert");
-          });
-
-          // 3. Force all glass cards to have solid dark backgrounds and borders in the export
-          const glassCards = element.querySelectorAll(".glass");
-          glassCards.forEach((card: any) => {
-            card.style.setProperty("background", "#14141E", "important");
-            card.style.setProperty("background-color", "#14141E", "important");
-            card.style.setProperty("border-color", "rgba(255, 255, 255, 0.08)", "important");
-          });
-
-          // 4. Force bright white color on headings
           const headings = element.querySelectorAll("h1, h2, h3, h4");
-          headings.forEach((h: any) => {
-            h.style.setProperty("color", "#FFFFFF", "important");
-          });
+          headings.forEach((h: any) => h.style.setProperty("color", "#FFFFFF", "important"));
 
-          // 5. Force bright readable text on paragraphs and list items
           const paragraphs = element.querySelectorAll("p");
-          paragraphs.forEach((p: any) => {
-            // Muted labels / subtexts
-            if (p.className.includes("text-[#71717A]") || p.className.includes("text-xs") || p.style.color === "rgb(113, 113, 122)") {
-              p.style.setProperty("color", "#9CA3AF", "important");
-            } else {
-              p.style.setProperty("color", "#F1F1F3", "important");
-            }
-          });
-
-          const listItems = element.querySelectorAll("li");
-          listItems.forEach((li: any) => {
-            li.style.setProperty("color", "#F1F1F3", "important");
-          });
-
-          // 6. Force bright colors on general text spans (safeguarding score bar / tag colors)
-          const spans = element.querySelectorAll("span");
-          spans.forEach((span: any) => {
-            if (span.style.color && span.style.color !== "rgb(255, 255, 255)") {
-              return; // Preserve custom colors like red/green score bars
-            }
-            if (span.className.includes("text-white") || span.className.includes("font-bold")) {
-              span.style.setProperty("color", "#FFFFFF", "important");
-            } else if (span.className.includes("text-[#71717A]")) {
-              span.style.setProperty("color", "#9CA3AF", "important");
-            }
-          });
+          paragraphs.forEach((p: any) => p.style.setProperty("color", "#F3F4F6", "important"));
         }
       });
       const link = document.createElement("a");
@@ -728,97 +712,121 @@ export default function RoastResultPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen" style={{ background: "var(--bg)" }}>
-        <header className="glass border-b border-white/[0.06]">
-          <div className="max-w-7xl mx-auto px-4 h-14 flex items-center">
-            <span>🔥</span>
-            <span style={{ fontFamily: "Syne, sans-serif", color: "var(--primary)" }} className="font-bold ml-2">RoastMeBuddy!</span>
+      <div className="min-h-screen relative overflow-hidden bg-[#06060A] text-[#F3F4F6]">
+        <AmbientBackground />
+        <header className="glass-specular border-b border-white/[0.08] relative z-10">
+          <div className="max-w-7xl mx-auto px-6 h-16 flex items-center">
+            <span className="text-2xl">🔥</span>
+            <span style={{ fontFamily: "Space Grotesk, sans-serif" }} className="text-xl font-bold grad-text ml-2">
+              RoastMeBuddy!
+            </span>
           </div>
         </header>
-        <div className="text-center pt-12 pb-6">
-          <div className="text-5xl animate-bounce mb-4">🔥</div>
-          <p style={{ fontFamily: "Syne, sans-serif" }} className="text-xl font-bold text-white mb-1">
+        <div className="text-center pt-16 pb-8 relative z-10">
+          <div className="w-20 h-20 mx-auto rounded-3xl glass border border-white/20 flex items-center justify-center text-4xl mb-6 animate-bounce shadow-[0_0_40px_rgba(255,69,0,0.3)]">
+            ⚡
+          </div>
+          <h2 style={{ fontFamily: "Space Grotesk, sans-serif" }} className="text-2xl sm:text-3xl font-extrabold text-white mb-2">
             {result?.mode === "portfolio" ? "Roasting your CV…" : "Roasting your product…"}
-          </p>
-          <p className="text-[#71717A] font-mono text-sm">Analyzing with AI across multiple dimensions</p>
+          </h2>
+          <p className="text-[#9CA3AF] font-mono text-sm">Evaluating structure, achievements, and impact across 6 dimensions</p>
         </div>
-        <LoadingSkeleton />
+        <div className="relative z-10">
+          <LoadingSkeleton />
+        </div>
       </div>
     );
   }
 
   if (!result) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "var(--bg)" }}>
-        <span className="text-5xl">💀</span>
-        <p style={{ fontFamily: "Syne, sans-serif" }} className="text-2xl font-bold text-white">Roast not found</p>
-        <Link href="/" className="btn-primary px-6 py-3 rounded-full">← Back Home</Link>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#06060A] text-[#F3F4F6] relative">
+        <AmbientBackground />
+        <span className="text-6xl relative z-10 animate-pulse">💀</span>
+        <p style={{ fontFamily: "Space Grotesk, sans-serif" }} className="text-2xl font-bold text-white relative z-10">Roast not found</p>
+        <Link href="/" className="btn-primary px-6 py-3 rounded-full relative z-10 font-bold">
+          ← Back to Home
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
-      {/* Header */}
-      <header className="glass border-b border-white/[0.06] sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <span>🔥</span>
-            <span style={{ fontFamily: "Syne, sans-serif", color: "var(--primary)" }} className="font-bold">RoastMeBuddy!</span>
+    <div className="min-h-screen relative overflow-hidden bg-[#06060A] text-[#F3F4F6]">
+      <AmbientBackground />
+
+      {/* Header Navbar */}
+      <header className="glass-specular border-b border-white/[0.08] sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 group">
+            <span className="text-2xl transition-transform duration-300 group-hover:scale-125 group-hover:rotate-12">🔥</span>
+            <span style={{ fontFamily: "Space Grotesk, sans-serif" }} className="text-lg font-extrabold grad-text">
+              RoastMeBuddy!
+            </span>
           </Link>
           <div className="flex items-center gap-3">
             {result.roastLevel && (
               <span
-                className="text-xs font-mono px-3 py-1 rounded-full border"
+                className="text-xs font-mono font-bold px-3 py-1 rounded-full border shadow-[0_0_15px_rgba(255,255,255,0.05)]"
                 style={{
-                  color: result.roastLevel === "brutal" ? "#EF4444" : result.roastLevel === "hard" ? "#F97316" : result.roastLevel === "medium" ? "#F59E0B" : "#22C55E",
-                  borderColor: result.roastLevel === "brutal" ? "rgba(239,68,68,0.3)" : result.roastLevel === "hard" ? "rgba(249,115,22,0.3)" : result.roastLevel === "medium" ? "rgba(245,158,11,0.3)" : "rgba(34,197,94,0.3)",
-                  background: result.roastLevel === "brutal" ? "rgba(239,68,68,0.1)" : result.roastLevel === "hard" ? "rgba(249,115,22,0.1)" : result.roastLevel === "medium" ? "rgba(245,158,11,0.1)" : "rgba(34,197,94,0.1)",
+                  color: result.roastLevel === "brutal" ? "#EF4444" : result.roastLevel === "hard" ? "#F97316" : result.roastLevel === "medium" ? "#F59E0B" : "#10B981",
+                  borderColor: result.roastLevel === "brutal" ? "rgba(239,68,68,0.4)" : result.roastLevel === "hard" ? "rgba(249,115,22,0.4)" : result.roastLevel === "medium" ? "rgba(245,158,11,0.4)" : "rgba(16,185,129,0.4)",
+                  background: result.roastLevel === "brutal" ? "rgba(239,68,68,0.12)" : result.roastLevel === "hard" ? "rgba(249,115,22,0.12)" : result.roastLevel === "medium" ? "rgba(245,158,11,0.12)" : "rgba(16,185,129,0.12)",
                 }}
               >
                 {result.roastLevel === "brutal" ? "💀🔥" : result.roastLevel === "hard" ? "🌶️🌶️🌶️" : result.roastLevel === "medium" ? "🌶️🌶️" : "🌶️"} {result.roastLevel.toUpperCase()}
               </span>
             )}
-            <div className="flex items-center gap-2 text-xs font-mono text-[#71717A]">
+            <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-[#9CA3AF] px-3 py-1 rounded-full glass border border-white/10">
               <span>Overall:</span>
-              <span style={{ color: "var(--primary)" }} className="font-bold text-sm">{result.audit.overallScore}/100</span>
+              <span className="font-extrabold text-sm text-[#FF8C00]">{result.audit.overallScore}/100</span>
             </div>
-            <button onClick={copyLink} className="btn-primary px-4 py-1.5 rounded-full text-sm flex items-center gap-2">
+            <button onClick={copyLink} className="btn-primary px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5">
               {copied ? "✅ Copied!" : "🔗 Share"}
             </button>
             {activeTab === "roast" && (
-              <button onClick={downloadImage} disabled={downloading} className="px-4 py-1.5 rounded-full text-sm flex items-center gap-2 border border-white/10 hover:bg-white/5 transition-all disabled:opacity-50">
+              <button
+                onClick={downloadImage}
+                disabled={downloading}
+                className="btn-ghost px-4 py-1.5 rounded-full text-xs font-mono flex items-center gap-1.5 disabled:opacity-50"
+              >
                 {downloading ? (
                   <>
-                    <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Exporting…
+                    <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Exporting…</span>
                   </>
-                ) : "📷 Download"}
+                ) : (
+                  <span>📷 Export</span>
+                )}
               </button>
             )}
           </div>
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        {/* Tabs */}
-        <div className="flex gap-1 overflow-x-auto pb-2 mb-8 scrollbar-hide">
-          {visibleTabs.map(tab => (
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 relative z-10">
+        {/* Navigation Tabs with Smooth Glass Pills */}
+        <div className="flex gap-1.5 overflow-x-auto pb-3 mb-8 scrollbar-hide">
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-mono transition-all whitespace-nowrap ${activeTab === tab.id ? "tab-active" : "text-[#71717A] hover:text-white hover:bg-white/5"}`}
+              className={`flex-shrink-0 px-5 py-2.5 rounded-full text-xs sm:text-sm font-mono transition-all whitespace-nowrap ${
+                activeTab === tab.id
+                  ? "tab-active font-bold"
+                  : "text-[#9CA3AF] hover:text-white hover:bg-white/5"
+              }`}
             >
               {tab.id === "ux" && result.mode === "portfolio" ? "📄 CV Layout" : tab.label}
             </button>
           ))}
         </div>
 
-        {/* Panel content */}
-        <div ref={captureRef} className="rounded-2xl">
+        {/* Dynamic Panel Content */}
+        <div ref={captureRef} className="rounded-3xl">
           {activeTab === "audit"     && <AuditPanel data={result.audit} mode={result.mode} />}
           {activeTab === "ux"        && <UXPanel data={result.ux} mode={result.mode} />}
-          {activeTab === "roast"    && <RoastPanel text={aiRoastText} loading={loadingRoast} onRetry={fetchNarrative} />}
+          {activeTab === "roast"     && <RoastPanel text={aiRoastText} loading={loadingRoast} onRetry={fetchNarrative} />}
           {activeTab === "personas"  && <PersonasPanel data={result.personas} />}
           {activeTab === "sharktank" && result.sharkTank && <SharkTankPanel data={result.sharkTank} />}
           {activeTab === "funeral"   && result.funeral && <FuneralPanel data={result.funeral} />}
